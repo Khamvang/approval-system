@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'screens/login_page.dart';
 import 'screens/home_page.dart';
+import 'screens/approvals_page.dart';
 import 'services/session.dart';
 
 void main() {
@@ -70,6 +71,8 @@ class _MainAppState extends State<MainApp> {
               case '/admin_user_page.dart':
               case '/users':
                 return MaterialPageRoute(builder: (_) => HomePage(user: usr, initialIndex: 3));
+              case '/approvals':
+                return ApprovalsPage.route();
               default:
                 return null;
             }
