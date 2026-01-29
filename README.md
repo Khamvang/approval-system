@@ -1,1 +1,3 @@
-# approval-system
+# approval
+
+A new Flutter project.
