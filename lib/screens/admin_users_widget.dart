@@ -282,17 +282,17 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
           underLabel = underVal;
         }
       }
-      return DataRow(cells: [
-        DataCell(Text(u['staff_no'] ?? '')),
-        DataCell(Text(first)),
-        DataCell(Text(last)),
-        DataCell(Text(u['nickname'] ?? '')),
-        DataCell(Text(u['email'] ?? '')),
-        DataCell(Text(u['department'] ?? '')),
-        DataCell(Text(u['role'] ?? '')),
-        DataCell(Text(underLabel)),
-        DataCell(Text(u['last_login'] ?? '')),
-        DataCell(Text(u['status'] ?? '')),
+        return DataRow(cells: [
+        DataCell(SelectableText(u['staff_no'] ?? '')),
+        DataCell(SelectableText(first)),
+        DataCell(SelectableText(last)),
+        DataCell(SelectableText(u['nickname'] ?? '')),
+        DataCell(SelectableText(u['email'] ?? '')),
+        DataCell(SelectableText(u['department'] ?? '')),
+        DataCell(SelectableText(u['role'] ?? '')),
+        DataCell(SelectableText(underLabel)),
+        DataCell(SelectableText(u['last_login'] ?? '')),
+        DataCell(SelectableText(u['status'] ?? '')),
         DataCell(Row(children: [IconButton(icon: const Icon(Icons.edit), onPressed: () => _editUser(u)), IconButton(icon: const Icon(Icons.delete), onPressed: () => _deleteUser(u))])),
       ]);
     }).toList();
@@ -336,17 +336,17 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
                         padding: const EdgeInsets.all(12),
                         child: DataTable(
                           columns: [
-                            const DataColumn(label: Text('Staff No')),
-                            const DataColumn(label: Text('First Name')),
-                            const DataColumn(label: Text('Last Name')),
-                            const DataColumn(label: Text('Nickname')),
-                            const DataColumn(label: Text('Email')),
-                            const DataColumn(label: Text('Department')),
-                            const DataColumn(label: Text('Role')),
-                            const DataColumn(label: Text('Under Manager')),
-                            const DataColumn(label: Text('Last Login')),
-                            const DataColumn(label: Text('Status')),
-                            const DataColumn(label: Text('Action')),
+                            const DataColumn(label: SelectableText('Staff No')),
+                            const DataColumn(label: SelectableText('First Name')),
+                            const DataColumn(label: SelectableText('Last Name')),
+                            const DataColumn(label: SelectableText('Nickname')),
+                            const DataColumn(label: SelectableText('Email')),
+                            const DataColumn(label: SelectableText('Department')),
+                            const DataColumn(label: SelectableText('Role')),
+                            const DataColumn(label: SelectableText('Under Manager')),
+                            const DataColumn(label: SelectableText('Last Login')),
+                            const DataColumn(label: SelectableText('Status')),
+                            const DataColumn(label: SelectableText('Action')),
                           ],
                           rows: rows,
                         ),
