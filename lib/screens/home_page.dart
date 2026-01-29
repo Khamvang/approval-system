@@ -307,7 +307,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const Divider(),
                       ListTile(leading: const Icon(Icons.dashboard), title: const Text('Overview'), onTap: () { Navigator.pop(context); setState(() => _selectedIndex = 0); Navigator.pushReplacementNamed(context, '/home_page.dart', arguments: widget.user); }),
-                      ListTile(leading: const Icon(Icons.check_circle_outline), title: const Text('Approvals'), onTap: () { Navigator.pop(context); setState(() => _selectedIndex = 1); Navigator.pushReplacementNamed(context, '/approvals_page.dart', arguments: widget.user); }),
+                      ListTile(leading: const Icon(Icons.check_circle_outline), title: const Text('Approvals'), onTap: () { Navigator.pop(context); setState(() => _selectedIndex = 1); Navigator.pushReplacementNamed(context, '/approvals', arguments: widget.user); }),
                       ListTile(leading: const Icon(Icons.bar_chart), title: const Text('Reports'), onTap: () { Navigator.pop(context); setState(() => _selectedIndex = 2); Navigator.pushReplacementNamed(context, '/reports_page.dart', arguments: widget.user); }),
                       ListTile(leading: const Icon(Icons.people), title: const Text('Users'), onTap: () { Navigator.pop(context); setState(() => _selectedIndex = 3); Navigator.pushReplacementNamed(context, '/admin_user_page.dart', arguments: widget.user); }),
                     ],
@@ -321,7 +321,7 @@ class _HomePageState extends State<HomePage> {
   String _routeForIndex(int index) {
     switch (index) {
       case 1:
-        return '/approvals_page.dart';
+        return '/approvals';
       case 2:
         return '/reports_page.dart';
       case 3:

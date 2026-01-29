@@ -1,0 +1,584 @@
+import 'package:flutter/material.dart';
+import '../services/session.dart';
+
+class ApprovalsPage extends StatefulWidget {
+  const ApprovalsPage({Key? key}) : super(key: key);
+
+  static Route route() => MaterialPageRoute(builder: (_) => const ApprovalsPage());
+
+  @override
+  _ApprovalsPageState createState() => _ApprovalsPageState();
+}
+
+class _ApprovalsPageState extends State<ApprovalsPage> {
+  final TextEditingController _searchController = TextEditingController();
+  final List<Map<String, String>> _recommended = [
+    {'title': 'System Modification Ringi'},
+    {'title': 'Expense Approval Ringi'},
+    {'title': 'Open Contract Approval Ringi'},
+    {'title': 'Close Contract Approval Ringi'},
+  ];
+
+  final List<Map<String, String>> _allApps = [
+    {'title': 'System Modification Ringi'},
+    {'title': 'Expense Approval Ringi'},
+    {'title': 'Open Contract Approval Ringi'},
+    {'title': 'Close Contract Approval Ringi'},
+    {'title': 'Clock-in/out Correction'},
+  ];
+
+  String _leftMenuSelected = 'Provided by other service providers';
+  int _selectedIndex = 1;
+  String? _language;
+  int _timeoutMinutes = 30;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final lang = await Session.getLanguage();
+    final t = await Session.getTimeoutMinutes();
+    if (!mounted) return;
+    setState(() {
+      _language = lang;
+      if (t != null) _timeoutMinutes = t;
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isWide = MediaQuery.of(context).size.width >= 900;
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        body: Row(
+          children: [
+            if (isWide)
+              Container(
+                width: 240,
+                color: Colors.white,
+                child: SafeArea(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            Image.asset('assets/images/lalco_logo.png', height: 36),
+                            const SizedBox(width: 8),
+                            const Expanded(child: Text('LALCO', style: TextStyle(fontWeight: FontWeight.bold))),
+                          ],
+                        ),
+                      ),
+                      const Divider(),
+                      _navItem(Icons.dashboard, 'Overview', 0, '/home_page.dart'),
+                      _navItem(Icons.check_circle_outline, 'Approvals', 1, '/approvals'),
+                      _navItem(Icons.bar_chart, 'Reports', 2, '/reports_page.dart'),
+                      _navItem(Icons.people, 'Users', 3, '/admin_user_page.dart'),
+                      const Spacer(),
+                    ],
+                  ),
+                ),
+              ),
+            Expanded(
+              child: Column(
+                children: [
+                  // Topbar
+                  Container(
+                    height: 64,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    color: Colors.white,
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 8),
+                        const Text('Approvals', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Spacer(),
+                        Row(
+                          children: [
+                            IconButton(icon: const Icon(Icons.search), onPressed: () {}),
+                            IconButton(icon: const Icon(Icons.notifications_none), onPressed: () {}),
+                            IconButton(icon: const Icon(Icons.settings), onPressed: () {}),
+                          ],
+                        ),
+                        const SizedBox(width: 12),
+                        GestureDetector(
+                          onTapDown: (details) => _showProfileMenu(details.globalPosition),
+                          child: Row(
+                            children: [
+                              CircleAvatar(child: Text('A')),
+                              if (_language != null) ...[
+                                const SizedBox(width: 8),
+                                Text(_language ?? '', style: const TextStyle(color: Colors.black54)),
+                                const SizedBox(width: 8),
+                                Text('$_timeoutMinutes min', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                              ]
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                    ),
+                  ),
+                  // Tabs
+                  Material(
+                    color: Colors.white,
+                    child: TabBar(
+                      tabs: const [
+                        Tab(text: 'Submit Request'),
+                        Tab(text: 'Approval Center'),
+                        Tab(text: 'Data Management'),
+                      ],
+                      labelColor: Colors.indigo,
+                      unselectedLabelColor: Colors.black87,
+                      indicatorColor: Colors.indigo,
+                      isScrollable: true,
+                    ),
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _buildMainContent(context),
+                        _buildApprovalCenter(),
+                        Center(child: Padding(padding: const EdgeInsets.all(24.0), child: Column(mainAxisSize: MainAxisSize.min, children: const [Text('Data Management', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), SizedBox(height: 12), Text('Data management tools and imports/exports will appear here.')] ))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildApprovalCenter() {
+    return DefaultTabController(
+      length: 4,
+      child: Column(
+        children: [
+          Material(
+            color: Colors.white,
+            child: TabBar(
+              tabs: const [
+                Tab(text: 'To-do'),
+                Tab(text: 'Done'),
+                Tab(text: 'CC'),
+                Tab(text: 'Submitted'),
+              ],
+              labelColor: Colors.indigo,
+              unselectedLabelColor: Colors.black87,
+              indicatorColor: Colors.indigo,
+              isScrollable: true,
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildApprovalListPlaceholder('To-do'),
+                _buildApprovalListPlaceholder('Done'),
+                _buildApprovalListPlaceholder('CC'),
+                _buildApprovalListPlaceholder('Submitted'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildApprovalListPlaceholder(String title) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Text('This is the $title list placeholder. Implement list and controls here.'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainContent(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildSearch(),
+          const SizedBox(height: 18),
+          _buildRecommended(),
+          const SizedBox(height: 18),
+          Expanded(child: _buildAllApplications(context)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearch() {
+    return TextField(
+      controller: _searchController,
+      decoration: InputDecoration(
+        prefixIcon: const Icon(Icons.search),
+        hintText: 'Please enter the name of the application',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
+        isDense: true,
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      onChanged: (v) => setState(() {}),
+    );
+  }
+
+  Widget _buildRecommended() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Recommended', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 84,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _recommended.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final title = _recommended[index]['title']!;
+              return GestureDetector(
+                onTap: () => _openApp(title),
+                child: Container(
+                  width: 260,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1))],
+                  ),
+                  child: Row(
+                    children: [
+                      _pinkAvatar(),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(title, style: const TextStyle(fontSize: 14))),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAllApplications(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 220,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _leftMenuButton('Provided by other service providers'),
+              const SizedBox(height: 8),
+              _leftMenuButton('Provided by our company'),
+            ],
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Provided by other service providers', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              Expanded(
+                child: LayoutBuilder(builder: (context, constraints) {
+                  final crossAxisCount = (constraints.maxWidth / 300).floor().clamp(1, 4);
+                  return GridView.builder(
+                    itemCount: _filteredApps().length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 3.6,
+                    ),
+                    itemBuilder: (context, index) {
+                      final title = _filteredApps()[index]['title']!;
+                      return GestureDetector(
+                        onTap: () => _openApp(title),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              _pinkAvatar(),
+                              const SizedBox(width: 12),
+                              Expanded(child: Text(title)),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                }),
+              ),
+              const SizedBox(height: 8),
+              Center(child: Text('All applications have been displayed', style: TextStyle(color: Colors.grey.shade600))),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Map<String, String>> _filteredApps() {
+    final q = _searchController.text.trim().toLowerCase();
+    if (q.isEmpty) return _allApps;
+    return _allApps.where((a) => a['title']!.toLowerCase().contains(q)).toList();
+  }
+
+  Widget _leftMenuButton(String title) {
+    final selected = _leftMenuSelected == title;
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: selected ? Colors.blue.shade50 : Colors.transparent,
+        foregroundColor: Colors.black87,
+        elevation: 0,
+        alignment: Alignment.centerLeft,
+      ),
+      onPressed: () => setState(() {
+        _leftMenuSelected = title;
+      }),
+      child: Text(title, style: TextStyle(color: selected ? Colors.blue : Colors.black87)),
+    );
+  }
+
+  Widget _pinkAvatar() {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(color: Colors.pink.shade400, borderRadius: BorderRadius.circular(6)),
+      child: const Icon(Icons.person, color: Colors.white, size: 22),
+    );
+  }
+
+  void _openApp(String title) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: const Text('This is a placeholder for the approval application. Implement specific flows here.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+          ElevatedButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Open')),
+        ],
+      ),
+    );
+  }
+
+  Widget _navItem(IconData icon, String label, int index, String route) {
+    final selected = _selectedIndex == index;
+    return InkWell(
+      onTap: () async {
+        setState(() => _selectedIndex = index);
+        final user = await Session.loadUser();
+        Navigator.pushReplacementNamed(context, route, arguments: user);
+      },
+      child: Container(
+        color: selected ? Colors.indigo.withAlpha((0.08 * 255).round()) : Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, color: selected ? Colors.indigo : Colors.grey[700]),
+            const SizedBox(width: 12),
+            Text(label, style: TextStyle(color: selected ? Colors.indigo : Colors.black87)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showProfileMenu(Offset globalPos) async {
+    try {
+      final user = await Session.loadUser() ?? {};
+      final first = (user['first_name'] ?? '').toString();
+      final last = (user['last_name'] ?? '').toString();
+      final staffNo = (user['staff_no'] ?? '').toString();
+      final nick = (user['nickname'] ?? '').toString();
+      final dept = (user['department'] ?? '').toString();
+      final displayName = (first.isNotEmpty || last.isNotEmpty) ? '$first $last' : (user['email'] ?? '');
+
+      final selected = await showMenu<int>(
+        context: context,
+        position: RelativeRect.fromLTRB(globalPos.dx, globalPos.dy, globalPos.dx, globalPos.dy),
+        items: [
+          PopupMenuItem<int>(
+            value: 0,
+            enabled: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 2),
+                Text('$staffNo - $nick', style: const TextStyle(color: Colors.grey)),
+                const SizedBox(height: 8),
+                Text(dept, style: const TextStyle(color: Colors.black87)),
+                if (_language != null) Text(_language == 'th' ? 'ไทย' : 'English', style: const TextStyle(color: Colors.black54)),
+                const Divider(),
+              ],
+            ),
+          ),
+          PopupMenuItem<int>(value: 10, child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Language'), const Icon(Icons.chevron_right)])),
+          PopupMenuItem<int>(value: 11, child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Session timeout'), const Icon(Icons.chevron_right)])),
+          PopupMenuItem<int>(value: 20, child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Switch Account'), const Icon(Icons.chevron_right)])),
+          const PopupMenuItem<int>(value: 30, child: Text('Log Out')),
+        ],
+      );
+
+      if (selected == 10) {
+        await _showLanguageMenu(globalPos);
+      } else if (selected == 11) {
+        await _chooseTimeout();
+      } else if (selected == 20) {
+        await _showSwitchAccountMenu(globalPos);
+      } else if (selected == 30) {
+        final ok = await _confirmLogout('Log Out');
+        if (ok) _handleSwitchOrLogout();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _showSwitchAccountMenu(Offset parentPos) async {
+    try {
+      final recent = await Session.getRecentUsers();
+      final items = <PopupMenuEntry<Map>>[];
+      if (recent.isEmpty) {
+        items.add(const PopupMenuItem<Map>(enabled: false, child: Text('No recent accounts on this browser')));
+        items.add(PopupMenuItem<Map>(value: {}, child: Text('Sign in as different user')));
+      } else {
+        for (final u in recent) {
+          final staff = (u['staff_no'] ?? '').toString();
+          final nick = (u['nickname'] ?? '').toString().trim();
+          final label = nick.isNotEmpty ? '$staff - $nick' : (u['email'] ?? staff).toString();
+          items.add(PopupMenuItem<Map>(value: u, child: Text(label)));
+        }
+      }
+
+      final sel = await showMenu<Map>(
+        context: context,
+        position: RelativeRect.fromLTRB(parentPos.dx + 200, parentPos.dy, parentPos.dx + 200, parentPos.dy),
+        items: items,
+      );
+
+      if (!mounted) return;
+      if (sel == null) return;
+
+      if (sel.isEmpty) {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+        return;
+      }
+
+      final email = (sel['email'] ?? '').toString();
+      if (email.isEmpty) return;
+
+      final saved = await Session.getSavedPasswordForEmail(email);
+      if (saved == null) {
+        final pwController = TextEditingController();
+        bool rememberChoice = false;
+        if (!mounted) return;
+        final ok = await showDialog<bool>(context: context, builder: (ctx) {
+          return AlertDialog(
+            title: Text('Enter password for $email'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: pwController, obscureText: true, decoration: const InputDecoration(labelText: 'Password')),
+                Row(children: [Checkbox(value: rememberChoice, onChanged: (v) { rememberChoice = v ?? false; (ctx as Element).markNeedsBuild(); }), const SizedBox(width: 6), const Text('Remember on this browser')]),
+              ],
+            ),
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sign In'))],
+          );
+        });
+        if (ok != true) return;
+      }
+
+      try {
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, '/');
+      } catch (e) {
+        if (!mounted) return;
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _showLanguageMenu(Offset parentPos) async {
+    final langs = {'en': 'English', 'th': 'ไทย'};
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(parentPos.dx + 200, parentPos.dy, parentPos.dx + 200, parentPos.dy),
+      items: langs.entries.map((e) => PopupMenuItem<String>(value: e.key, child: Text(e.value))).toList(),
+    );
+    if (selected != null) {
+      await Session.setLanguage(selected);
+      if (!mounted) return;
+      setState(() => _language = selected);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Language updated')));
+    }
+  }
+
+  Future<void> _chooseTimeout() async {
+    final options = [1, 5, 15, 30];
+    final selected = await showDialog<int?>(context: context, builder: (ctx) {
+      return SimpleDialog(
+        title: const Text('Session timeout (minutes)'),
+        children: options.map((m) => SimpleDialogOption(child: Text('$m minutes'), onPressed: () => Navigator.pop(ctx, m))).toList(),
+      );
+    });
+    if (selected != null) {
+      await Session.setTimeoutMinutes(selected);
+      _timeoutMinutes = selected;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Timeout set to $selected minutes')));
+    }
+  }
+
+  Future<bool> _confirmLogout(String title) async {
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: const Text('Are you sure?'),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes'))],
+    ));
+    return ok == true;
+  }
+
+  void _handleSwitchOrLogout() async {
+    await Session.clear();
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, '/');
+  }
+
+}
