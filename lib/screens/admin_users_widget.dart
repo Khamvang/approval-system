@@ -85,13 +85,13 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
                 TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email')),
                 TextField(controller: passController, decoration: const InputDecoration(labelText: 'Password (leave blank to keep)')),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(value: selectedRole, items: ['User', 'Manager', 'Admin'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(), onChanged: (v) => setState(() => selectedRole = v ?? 'User'), decoration: const InputDecoration(labelText: 'Role')),
+                DropdownButtonFormField<String>(initialValue: selectedRole, items: ['User', 'Manager', 'Admin'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(), onChanged: (v) => setState(() => selectedRole = v ?? 'User'), decoration: const InputDecoration(labelText: 'Role')),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(value: selectedDept.isEmpty ? null : selectedDept, items: deptOptions.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(), onChanged: (v) => setState(() => selectedDept = v ?? ''), decoration: const InputDecoration(labelText: 'Department')),
+                DropdownButtonFormField<String>(initialValue: selectedDept.isEmpty ? null : selectedDept, items: deptOptions.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(), onChanged: (v) => setState(() => selectedDept = v ?? ''), decoration: const InputDecoration(labelText: 'Department')),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String?>(value: underController.text.isEmpty ? null : underController.text, items: managerItems, onChanged: (v) => setState(() => underController.text = v ?? ''), decoration: const InputDecoration(labelText: 'Under Manager')),
+                DropdownButtonFormField<String?>(initialValue: underController.text.isEmpty ? null : underController.text, items: managerItems, onChanged: (v) => setState(() => underController.text = v ?? ''), decoration: const InputDecoration(labelText: 'Under Manager')),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(value: statusController.text.isNotEmpty ? statusController.text : 'Active', items: ['Active', 'Inactive'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setState(() => statusController.text = v ?? 'Active'), decoration: const InputDecoration(labelText: 'Status')),
+                DropdownButtonFormField<String>(initialValue: statusController.text.isNotEmpty ? statusController.text : 'Active', items: ['Active', 'Inactive'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setState(() => statusController.text = v ?? 'Active'), decoration: const InputDecoration(labelText: 'Status')),
               ],
             ),
           ),
@@ -139,8 +139,6 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
     final lastController = TextEditingController();
     final emailController = TextEditingController();
     final passController = TextEditingController();
-    final roleController = TextEditingController(text: 'User');
-    final deptController = TextEditingController();
     final underController = TextEditingController();
     final statusController = TextEditingController(text: 'Active');
 
@@ -170,13 +168,13 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
                 TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email')),
                 TextField(controller: passController, decoration: const InputDecoration(labelText: 'Password')),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(value: selectedRole, items: ['User', 'Manager', 'Admin'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(), onChanged: (v) => setState(() => selectedRole = v ?? 'User'), decoration: const InputDecoration(labelText: 'Role')),
+                DropdownButtonFormField<String>(initialValue: selectedRole, items: ['User', 'Manager', 'Admin'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(), onChanged: (v) => setState(() => selectedRole = v ?? 'User'), decoration: const InputDecoration(labelText: 'Role')),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(value: selectedDept.isEmpty ? null : selectedDept, items: deptOptions.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(), onChanged: (v) => setState(() => selectedDept = v ?? ''), decoration: const InputDecoration(labelText: 'Department')),
+                DropdownButtonFormField<String>(initialValue: selectedDept.isEmpty ? null : selectedDept, items: deptOptions.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(), onChanged: (v) => setState(() => selectedDept = v ?? ''), decoration: const InputDecoration(labelText: 'Department')),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String?>(value: underController.text.isEmpty ? null : underController.text, items: managerItems, onChanged: (v) => setState(() => underController.text = v ?? ''), decoration: const InputDecoration(labelText: 'Under Manager')),
+                DropdownButtonFormField<String?>(initialValue: underController.text.isEmpty ? null : underController.text, items: managerItems, onChanged: (v) => setState(() => underController.text = v ?? ''), decoration: const InputDecoration(labelText: 'Under Manager')),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(value: statusController.text.isNotEmpty ? statusController.text : 'Active', items: ['Active', 'Inactive'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setState(() => statusController.text = v ?? 'Active'), decoration: const InputDecoration(labelText: 'Status')),
+                DropdownButtonFormField<String>(initialValue: statusController.text.isNotEmpty ? statusController.text : 'Active', items: ['Active', 'Inactive'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setState(() => statusController.text = v ?? 'Active'), decoration: const InputDecoration(labelText: 'Status')),
               ],
             ),
           ),
@@ -256,7 +254,7 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
       }
       if (q.isEmpty) return true;
       final email = (u['email'] ?? '').toString().toLowerCase();
-      final name = ((u['first_name'] ?? '') as String).toString().toLowerCase() + ' ' + ((u['last_name'] ?? '') as String).toString().toLowerCase();
+      final name = '${(u['first_name'] ?? '').toString().toLowerCase()} ${(u['last_name'] ?? '').toString().toLowerCase()}';
       final staff = (u['staff_no'] ?? '').toString().toLowerCase();
       return email.contains(q) || name.contains(q) || staff.contains(q);
     }).toList();
@@ -265,7 +263,7 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
   @override
   Widget build(BuildContext context) {
     final deptOptions = ['Sales', 'Collection', 'Credit', 'Contract', 'Accounting', 'HR', 'IT'];
-    final deptItems = [null, ...deptOptions].map<DropdownMenuItem<String?>>((d) => DropdownMenuItem<String?>(value: d as String?, child: Text(d ?? 'All'))).toList();
+    final deptItems = [null, ...deptOptions].map<DropdownMenuItem<String?>>((d) => DropdownMenuItem<String?>(value: d, child: Text(d ?? 'All'))).toList();
     final rows = _filteredUsers.map<DataRow>((u) {
       final first = (u['first_name'] ?? '').toString();
       final last = (u['last_name'] ?? '').toString();

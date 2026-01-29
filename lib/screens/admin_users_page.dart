@@ -32,12 +32,13 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       final resp = await http.get(Uri.parse('${_apiHost()}/api/users'));
       if (resp.statusCode == 200) {
         final body = json.decode(resp.body);
+        if (!mounted) return;
         setState(() => _users = body['users'] ?? []);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to load users')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to load users')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach API')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach API')));
     } finally {
       setState(() => _loading = false);
     }
@@ -72,13 +73,13 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     try {
       final resp = await http.patch(Uri.parse('${_apiHost()}/api/users/${user['id']}'), headers: {'Content-Type': 'application/json'}, body: json.encode(payload));
       if (resp.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User updated')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User updated')));
         await _loadUsers();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Update failed')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Update failed')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach API')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach API')));
     }
   }
 
@@ -111,13 +112,13 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     try {
       final resp = await http.post(Uri.parse('${_apiHost()}/api/users'), headers: {'Content-Type': 'application/json'}, body: json.encode(payload));
       if (resp.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User created')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User created')));
         await _loadUsers();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Create failed')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Create failed')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach API')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not reach API')));
     }
   }
 
