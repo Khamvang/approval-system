@@ -20,6 +20,7 @@ def init_sqlite(db_path='users.db'):
         staff_no TEXT,
         first_name TEXT,
         last_name TEXT,
+        nickname TEXT,
         under_manager TEXT,
         last_login TEXT,
         status TEXT NOT NULL DEFAULT 'active'
@@ -33,6 +34,7 @@ def init_sqlite(db_path='users.db'):
         'staff_no': "TEXT",
         'first_name': "TEXT",
         'last_name': "TEXT",
+        'nickname': "TEXT",
         'under_manager': "TEXT",
         'last_login': "TEXT",
         'status': "TEXT DEFAULT 'active'"
@@ -71,7 +73,7 @@ def init_sqlite(db_path='users.db'):
                     status TEXT NOT NULL DEFAULT 'active'
                 )
             ''')
-            cur.execute('INSERT OR IGNORE INTO users_new (id, email, password_hash, role, department, staff_no, first_name, last_name, under_manager, last_login, status) SELECT id, email, password_hash, role, department, staff_no, first_name, last_name, under_manager, last_login, status FROM users')
+            cur.execute('INSERT OR IGNORE INTO users_new (id, email, password_hash, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status) SELECT id, email, password_hash, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status FROM users')
             cur.execute('DROP TABLE users')
             cur.execute('ALTER TABLE users_new RENAME TO users')
             cur.execute('COMMIT')
@@ -80,13 +82,14 @@ def init_sqlite(db_path='users.db'):
         finally:
             cur.execute("PRAGMA foreign_keys=on")
     try:
-        cur.execute('INSERT INTO users (email, password_hash, role, department, staff_no, first_name, last_name, under_manager, last_login, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (
+        cur.execute('INSERT INTO users (email, password_hash, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (
             'admin@example.com',
             generate_password_hash('admin123'),
             'Admin',
             'IT',
             'STAFF001',
             'Administrator',
+            '',
             '',
             None,
             None,
@@ -122,6 +125,7 @@ def init_mysql(host, port, user, password, db_name):
         staff_no VARCHAR(100),
         first_name VARCHAR(255),
         last_name VARCHAR(255),
+        nickname VARCHAR(255),
         under_manager VARCHAR(255),
         last_login DATETIME,
         status VARCHAR(50) NOT NULL DEFAULT 'active'
@@ -134,6 +138,7 @@ def init_mysql(host, port, user, password, db_name):
         'staff_no': 'VARCHAR(100) NULL',
         'first_name': 'VARCHAR(255) NULL',
         'last_name': 'VARCHAR(255) NULL',
+        'nickname': 'VARCHAR(255) NULL',
         'under_manager': 'VARCHAR(255) NULL',
         'last_login': 'DATETIME NULL',
         'status': "VARCHAR(50) NOT NULL DEFAULT 'active'"
@@ -164,13 +169,14 @@ def init_mysql(host, port, user, password, db_name):
         except Exception:
             pass
     try:
-        cur.execute('INSERT INTO users (email, password_hash, role, department, staff_no, first_name, last_name, under_manager, last_login, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', (
+            cur.execute('INSERT INTO users (email, password_hash, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', (
             'admin@example.com',
             generate_password_hash('admin123'),
             'Admin',
             'IT',
             'STAFF001',
             'Administrator',
+            '',
             '',
             None,
             None,

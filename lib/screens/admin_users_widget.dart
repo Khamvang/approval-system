@@ -48,48 +48,67 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
   Future<void> _editUser(Map user) async {
     final staffController = TextEditingController(text: user['staff_no'] ?? '');
     final emailController = TextEditingController(text: user['email'] ?? '');
-    final roleController = TextEditingController(text: user['role'] ?? 'User');
-    final deptController = TextEditingController(text: user['department'] ?? '');
+    final roleVal = user['role'] ?? 'User';
+    String selectedRole = roleVal;
+    final deptVal = user['department'] ?? '';
+    String selectedDept = deptVal;
+    final deptOptions = ['Sales', 'Collection', 'Credit', 'Contract', 'Accounting', 'HR', 'IT'];
     final underController = TextEditingController(text: user['under_manager'] ?? '');
     final statusController = TextEditingController(text: user['status'] ?? '');
+    final nicknameController = TextEditingController(text: user['nickname'] ?? '');
     // use separate first_name / last_name fields only
     final firstController = TextEditingController(text: (user['first_name'] ?? '').toString());
     final lastController = TextEditingController(text: (user['last_name'] ?? '').toString());
     final passController = TextEditingController();
 
     final res = await showDialog<bool>(context: context, builder: (ctx) {
-      return AlertDialog(
-        title: const Text('Edit user'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: staffController, decoration: const InputDecoration(labelText: 'Staff No')),
-              Row(children: [Expanded(child: TextField(controller: firstController, decoration: const InputDecoration(labelText: 'First Name'))), const SizedBox(width: 8), Expanded(child: TextField(controller: lastController, decoration: const InputDecoration(labelText: 'Last Name')))]),
-              TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email')),
-              TextField(controller: passController, decoration: const InputDecoration(labelText: 'Password (leave blank to keep)')),
-              TextField(controller: roleController, decoration: const InputDecoration(labelText: 'Role')),
-              TextField(controller: deptController, decoration: const InputDecoration(labelText: 'Department')),
-              TextField(controller: underController, decoration: const InputDecoration(labelText: 'Under Manager')),
-              TextField(controller: statusController, decoration: const InputDecoration(labelText: 'Status')),
-            ],
+      return StatefulBuilder(builder: (ctx, setState) {
+        // build manager list for selectedDept
+        final managers = _users.where((u) => (u['role'] ?? '') == 'Manager' && (u['department'] ?? '') == selectedDept).toList();
+        final managerItems = [null, ...managers].map<DropdownMenuItem<String?>>((m) => DropdownMenuItem<String?>(value: m == null ? null : (m['staff_no'] ?? ''), child: Text(m == null ? '' : '${m['staff_no'] ?? ''} - ${m['nickname'] ?? ''}'))).toList();
+        return AlertDialog(
+          title: const Text('Edit user'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: staffController, decoration: const InputDecoration(labelText: 'Staff No')),
+                Row(children: [Expanded(child: TextField(controller: firstController, decoration: const InputDecoration(labelText: 'First Name'))), const SizedBox(width: 8), Expanded(child: TextField(controller: lastController, decoration: const InputDecoration(labelText: 'Last Name')))]),
+                TextField(controller: nicknameController, decoration: const InputDecoration(labelText: 'Nickname')),
+                TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email')),
+                TextField(controller: passController, decoration: const InputDecoration(labelText: 'Password (leave blank to keep)')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(value: selectedRole, items: ['User', 'Manager', 'Admin'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(), onChanged: (v) => setState(() => selectedRole = v ?? 'User'), decoration: const InputDecoration(labelText: 'Role')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(value: selectedDept.isEmpty ? null : selectedDept, items: deptOptions.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(), onChanged: (v) => setState(() => selectedDept = v ?? ''), decoration: const InputDecoration(labelText: 'Department')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String?>(value: underController.text.isEmpty ? null : underController.text, items: managerItems, onChanged: (v) => setState(() => underController.text = v ?? ''), decoration: const InputDecoration(labelText: 'Under Manager')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(value: statusController.text.isNotEmpty ? statusController.text : 'Active', items: ['Active', 'Inactive'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setState(() => statusController.text = v ?? 'Active'), decoration: const InputDecoration(labelText: 'Status')),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
-        ],
-      );
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            ElevatedButton(onPressed: () {
+              // validate role and department selections
+              if (!['User', 'Manager', 'Admin'].contains(selectedRole)) return; 
+              Navigator.pop(ctx, true);
+            }, child: const Text('Save')),
+          ],
+        );
+      });
     });
 
     if (res != true) return;
 
     final payload = {
-      'role': roleController.text.trim(),
-      'department': deptController.text.trim(),
+      'role': selectedRole.trim(),
+      'department': selectedDept.trim(),
       'staff_no': staffController.text.trim(),
       'first_name': firstController.text.trim(),
       'last_name': lastController.text.trim(),
+      'nickname': nicknameController.text.trim(),
       'under_manager': underController.text.trim(),
       'status': statusController.text.trim(),
     };
@@ -118,29 +137,42 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
     final underController = TextEditingController();
     final statusController = TextEditingController(text: 'active');
 
+    String selectedRole = 'User';
+    String selectedDept = '';
+    final deptOptions = ['Sales', 'Collection', 'Credit', 'Contract', 'Accounting', 'HR', 'IT'];
+    final nicknameController = TextEditingController();
     final res = await showDialog<bool>(context: context, builder: (ctx) {
-      return AlertDialog(
-        title: const Text('Create user'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: staffController, decoration: const InputDecoration(labelText: 'Staff No')),
-              Row(children: [Expanded(child: TextField(controller: firstController, decoration: const InputDecoration(labelText: 'First Name'))), const SizedBox(width: 8), Expanded(child: TextField(controller: lastController, decoration: const InputDecoration(labelText: 'Last Name')))]),
-              TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email')),
-              TextField(controller: passController, decoration: const InputDecoration(labelText: 'Password')),
-              TextField(controller: roleController, decoration: const InputDecoration(labelText: 'Role')),
-              TextField(controller: deptController, decoration: const InputDecoration(labelText: 'Department')),
-              TextField(controller: underController, decoration: const InputDecoration(labelText: 'Under Manager')),
-              TextField(controller: statusController, decoration: const InputDecoration(labelText: 'Status')),
-            ],
+      return StatefulBuilder(builder: (ctx, setState) {
+        final managers = _users.where((u) => (u['role'] ?? '') == 'Manager' && (u['department'] ?? '') == selectedDept).toList();
+        final managerItems = [null, ...managers].map<DropdownMenuItem<String?>>((m) => DropdownMenuItem<String?>(value: m == null ? null : (m['staff_no'] ?? ''), child: Text(m == null ? '' : '${m['staff_no'] ?? ''} - ${m['nickname'] ?? ''}'))).toList();
+        return AlertDialog(
+          title: const Text('Create user'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: staffController, decoration: const InputDecoration(labelText: 'Staff No')),
+                Row(children: [Expanded(child: TextField(controller: firstController, decoration: const InputDecoration(labelText: 'First Name'))), const SizedBox(width: 8), Expanded(child: TextField(controller: lastController, decoration: const InputDecoration(labelText: 'Last Name')))]),
+                TextField(controller: nicknameController, decoration: const InputDecoration(labelText: 'Nickname')),
+                TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email')),
+                TextField(controller: passController, decoration: const InputDecoration(labelText: 'Password')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(value: selectedRole, items: ['User', 'Manager', 'Admin'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(), onChanged: (v) => setState(() => selectedRole = v ?? 'User'), decoration: const InputDecoration(labelText: 'Role')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(value: selectedDept.isEmpty ? null : selectedDept, items: deptOptions.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(), onChanged: (v) => setState(() => selectedDept = v ?? ''), decoration: const InputDecoration(labelText: 'Department')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String?>(value: underController.text.isEmpty ? null : underController.text, items: managerItems, onChanged: (v) => setState(() => underController.text = v ?? ''), decoration: const InputDecoration(labelText: 'Under Manager')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(value: statusController.text.isNotEmpty ? statusController.text : 'Active', items: ['Active', 'Inactive'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setState(() => statusController.text = v ?? 'Active'), decoration: const InputDecoration(labelText: 'Status')),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Create')),
-        ],
-      );
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Create')),
+          ],
+        );
+      });
     });
 
     if (res != true) return;
@@ -149,10 +181,11 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
       'staff_no': staffController.text.trim(),
       'first_name': firstController.text.trim(),
       'last_name': lastController.text.trim(),
+      'nickname': nicknameController.text.trim(),
       'email': emailController.text.trim(),
       'password': passController.text,
-      'role': roleController.text.trim(),
-      'department': deptController.text.trim(),
+      'role': selectedRole.trim(),
+      'department': selectedDept.trim(),
       'under_manager': underController.text.trim(),
       'status': statusController.text.trim(),
     };
@@ -192,11 +225,12 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
   void _exportCsv() {
     final rows = _filteredUsers;
     final buffer = StringBuffer();
-    buffer.writeln('staff_no,first_name,last_name,email,department,role,under_manager,last_login,status');
+    buffer.writeln('staff_no,first_name,last_name,nickname,email,department,role,under_manager,last_login,status');
     for (final u in rows) {
       final first = (u['first_name'] ?? '').toString();
       final last = (u['last_name'] ?? '').toString();
-      buffer.writeln('"${u['staff_no'] ?? ''}","$first","$last","${u['email'] ?? ''}","${u['department'] ?? ''}","${u['role'] ?? ''}","${u['under_manager'] ?? ''}","${u['last_login'] ?? ''}","${u['status'] ?? ''}"');
+      final nick = (u['nickname'] ?? '').toString();
+      buffer.writeln('"${u['staff_no'] ?? ''}","$first","$last","$nick","${u['email'] ?? ''}","${u['department'] ?? ''}","${u['role'] ?? ''}","${u['under_manager'] ?? ''}","${u['last_login'] ?? ''}","${u['status'] ?? ''}"');
     }
     showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('CSV Export'), content: SingleChildScrollView(child: SelectableText(buffer.toString())), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))]));
   }
@@ -217,8 +251,8 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final deptSet = _users.map((u) => u['department']).where((d) => d != null).toSet();
-    final deptItems = [null, ...deptSet].map<DropdownMenuItem<String?>>((d) => DropdownMenuItem<String?>(value: d as String?, child: Text(d ?? 'All'))).toList();
+    final deptOptions = ['Sales', 'Collection', 'Credit', 'Contract', 'Accounting', 'HR', 'IT'];
+    final deptItems = [null, ...deptOptions].map<DropdownMenuItem<String?>>((d) => DropdownMenuItem<String?>(value: d as String?, child: Text(d ?? 'All'))).toList();
     final rows = _filteredUsers.map<DataRow>((u) {
       final first = (u['first_name'] ?? '').toString();
       final last = (u['last_name'] ?? '').toString();
@@ -226,6 +260,7 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
         DataCell(Text(u['staff_no'] ?? '')),
         DataCell(Text(first)),
         DataCell(Text(last)),
+        DataCell(Text(u['nickname'] ?? '')),
         DataCell(Text(u['email'] ?? '')),
         DataCell(Text(u['department'] ?? '')),
         DataCell(Text(u['role'] ?? '')),
@@ -278,6 +313,7 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
                             const DataColumn(label: Text('Staff No')),
                             const DataColumn(label: Text('First Name')),
                             const DataColumn(label: Text('Last Name')),
+                            const DataColumn(label: Text('Nickname')),
                             const DataColumn(label: Text('Email')),
                             const DataColumn(label: Text('Department')),
                             const DataColumn(label: Text('Role')),

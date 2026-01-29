@@ -49,7 +49,7 @@ def query_user(email):
 
 
 def query_all_users():
-    select_cols = 'id, email, role, department, staff_no, first_name, last_name, under_manager, last_login, status'
+    select_cols = 'id, email, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status'
     if DB_TYPE.lower() == 'mysql':
         conn = get_mysql_conn()
         cur = conn.cursor(dictionary=True)
@@ -71,7 +71,7 @@ def get_user_by_id(user_id):
     if DB_TYPE.lower() == 'mysql':
         conn = get_mysql_conn()
         cur = conn.cursor(dictionary=True)
-        cur.execute('SELECT id, email, role, department, staff_no, first_name, last_name, under_manager, last_login, status FROM users WHERE id = %s', (user_id,))
+        cur.execute('SELECT id, email, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status FROM users WHERE id = %s', (user_id,))
         row = cur.fetchone()
         cur.close()
         conn.close()
@@ -79,7 +79,7 @@ def get_user_by_id(user_id):
     else:
         conn = get_sqlite_conn()
         cur = conn.cursor()
-        cur.execute('SELECT id, email, role, department, staff_no, first_name, last_name, under_manager, last_login, status FROM users WHERE id = ?', (user_id,))
+        cur.execute('SELECT id, email, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status FROM users WHERE id = ?', (user_id,))
         row = cur.fetchone()
         conn.close()
         return dict(row) if row is not None else None
@@ -225,7 +225,8 @@ def users_collection():
         conn = get_mysql_conn()
         cur = conn.cursor()
         try:
-            cur.execute('INSERT INTO users (email, password_hash, role, department, staff_no, first_name, last_name, under_manager, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)', (email, password_hash, role, department, staff_no, first_name, last_name, under_manager, status))
+            nickname = data.get('nickname')
+            cur.execute('INSERT INTO users (email, password_hash, role, department, staff_no, first_name, last_name, nickname, under_manager, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', (email, password_hash, role, department, staff_no, first_name, last_name, nickname, under_manager, status))
             conn.commit()
             user_id = cur.lastrowid
         except Exception as e:
@@ -239,7 +240,8 @@ def users_collection():
         conn = get_sqlite_conn()
         cur = conn.cursor()
         try:
-            cur.execute('INSERT INTO users (email, password_hash, role, department, staff_no, first_name, last_name, under_manager, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', (email, password_hash, role, department, staff_no, first_name, last_name, under_manager, status))
+            nickname = data.get('nickname')
+            cur.execute('INSERT INTO users (email, password_hash, role, department, staff_no, first_name, last_name, nickname, under_manager, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (email, password_hash, role, department, staff_no, first_name, last_name, nickname, under_manager, status))
             conn.commit()
             user_id = cur.lastrowid
         except Exception as e:
@@ -283,6 +285,7 @@ def users_item(user_id):
     # accept only first_name/last_name in PATCH
     first_name = data.get('first_name')
     last_name = data.get('last_name')
+    nickname = data.get('nickname')
     under_manager = data.get('under_manager')
     status = data.get('status')
     email = data.get('email')
@@ -307,6 +310,9 @@ def users_item(user_id):
     if last_name is not None:
         updates.append('last_name = ?')
         params.append(last_name)
+    if nickname is not None:
+        updates.append('nickname = ?')
+        params.append(nickname)
     if under_manager is not None:
         updates.append('under_manager = ?')
         params.append(under_manager)
