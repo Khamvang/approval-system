@@ -54,7 +54,8 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
     String selectedDept = deptVal;
     final deptOptions = ['Sales', 'Collection', 'Credit', 'Contract', 'Accounting', 'HR', 'IT'];
     final underController = TextEditingController(text: user['under_manager'] ?? '');
-    final statusController = TextEditingController(text: user['status'] ?? '');
+    final statusRaw = (user['status'] ?? '').toString();
+    final statusController = TextEditingController(text: statusRaw.isNotEmpty ? (statusRaw[0].toUpperCase() + statusRaw.substring(1)) : '');
     final nicknameController = TextEditingController(text: user['nickname'] ?? '');
     // use separate first_name / last_name fields only
     final firstController = TextEditingController(text: (user['first_name'] ?? '').toString());
@@ -63,9 +64,15 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
 
     final res = await showDialog<bool>(context: context, builder: (ctx) {
       return StatefulBuilder(builder: (ctx, setState) {
-        // build manager list for selectedDept
+        // build manager list for selectedDept and show nickname or fallback
         final managers = _users.where((u) => (u['role'] ?? '') == 'Manager' && (u['department'] ?? '') == selectedDept).toList();
-        final managerItems = [null, ...managers].map<DropdownMenuItem<String?>>((m) => DropdownMenuItem<String?>(value: m == null ? null : (m['staff_no'] ?? ''), child: Text(m == null ? '' : '${m['staff_no'] ?? ''} - ${m['nickname'] ?? ''}'))).toList();
+        final managerItems = [null, ...managers].map<DropdownMenuItem<String?>>((m) {
+          if (m == null) return DropdownMenuItem<String?>(value: null, child: const Text(''));
+          final staff = (m['staff_no'] ?? '').toString();
+          final nickRaw = (m['nickname'] ?? '').toString().trim();
+          final nick = nickRaw.isNotEmpty ? nickRaw : '(no nickname)';
+          return DropdownMenuItem<String?>(value: staff, child: Text('$staff - $nick'));
+        }).toList();
         return AlertDialog(
           title: const Text('Edit user'),
           content: SingleChildScrollView(
@@ -135,7 +142,7 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
     final roleController = TextEditingController(text: 'User');
     final deptController = TextEditingController();
     final underController = TextEditingController();
-    final statusController = TextEditingController(text: 'active');
+    final statusController = TextEditingController(text: 'Active');
 
     String selectedRole = 'User';
     String selectedDept = '';
@@ -144,7 +151,13 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
     final res = await showDialog<bool>(context: context, builder: (ctx) {
       return StatefulBuilder(builder: (ctx, setState) {
         final managers = _users.where((u) => (u['role'] ?? '') == 'Manager' && (u['department'] ?? '') == selectedDept).toList();
-        final managerItems = [null, ...managers].map<DropdownMenuItem<String?>>((m) => DropdownMenuItem<String?>(value: m == null ? null : (m['staff_no'] ?? ''), child: Text(m == null ? '' : '${m['staff_no'] ?? ''} - ${m['nickname'] ?? ''}'))).toList();
+        final managerItems = [null, ...managers].map<DropdownMenuItem<String?>>((m) {
+          if (m == null) return DropdownMenuItem<String?>(value: null, child: const Text(''));
+          final staff = (m['staff_no'] ?? '').toString();
+          final nickRaw = (m['nickname'] ?? '').toString().trim();
+          final nick = nickRaw.isNotEmpty ? nickRaw : '(no nickname)';
+          return DropdownMenuItem<String?>(value: staff, child: Text('$staff - $nick'));
+        }).toList();
         return AlertDialog(
           title: const Text('Create user'),
           content: SingleChildScrollView(
@@ -187,7 +200,7 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
       'role': selectedRole.trim(),
       'department': selectedDept.trim(),
       'under_manager': underController.text.trim(),
-      'status': statusController.text.trim(),
+      'status': statusController.text.trim().toLowerCase(),
     };
     try {
       final resp = await http.post(Uri.parse('${_apiHost()}/api/users'), headers: {'Content-Type': 'application/json'}, body: json.encode(payload));
@@ -256,6 +269,21 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
     final rows = _filteredUsers.map<DataRow>((u) {
       final first = (u['first_name'] ?? '').toString();
       final last = (u['last_name'] ?? '').toString();
+      // compute under manager label: find manager by staff_no and show StaffNo - Nickname (fallback)
+      final underVal = (u['under_manager'] ?? '').toString();
+      String underLabel = '';
+      if (underVal.isNotEmpty) {
+        final mgrList = _users.where((x) => (x['staff_no'] ?? '').toString() == underVal).toList();
+        if (mgrList.isNotEmpty) {
+          final m = mgrList.first;
+          final mStaff = (m['staff_no'] ?? '').toString();
+          final mNickRaw = (m['nickname'] ?? '').toString().trim();
+          final mNick = mNickRaw.isNotEmpty ? mNickRaw : '(no nickname)';
+          underLabel = '$mStaff - $mNick';
+        } else {
+          underLabel = underVal;
+        }
+      }
       return DataRow(cells: [
         DataCell(Text(u['staff_no'] ?? '')),
         DataCell(Text(first)),
@@ -264,7 +292,7 @@ class _AdminUsersWidgetState extends State<AdminUsersWidget> {
         DataCell(Text(u['email'] ?? '')),
         DataCell(Text(u['department'] ?? '')),
         DataCell(Text(u['role'] ?? '')),
-        DataCell(Text(u['under_manager'] ?? '')),
+        DataCell(Text(underLabel)),
         DataCell(Text(u['last_login'] ?? '')),
         DataCell(Text(u['status'] ?? '')),
         DataCell(Row(children: [IconButton(icon: const Icon(Icons.edit), onPressed: () => _editUser(u)), IconButton(icon: const Icon(Icons.delete), onPressed: () => _deleteUser(u))])),

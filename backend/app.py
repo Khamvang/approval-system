@@ -125,7 +125,7 @@ def debug_users():
     if os.getenv('ENABLE_DEV_ENDPOINTS') != '1' and os.getenv('FLASK_ENV') != 'development':
         return jsonify({'error': 'Not allowed'}), 403
 
-    select_cols = 'id, email, role, department, staff_no, first_name, last_name, under_manager, last_login, status'
+    select_cols = 'id, email, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status'
     if DB_TYPE.lower() == 'mysql':
         conn = get_mysql_conn()
         cur = conn.cursor(dictionary=True)
@@ -180,7 +180,7 @@ def users_collection():
                 where.append('status = ?')
                 params.append(status)
 
-        select_cols = 'id, email, role, department, staff_no, first_name, last_name, under_manager, last_login, status'
+        select_cols = 'id, email, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status'
         if DB_TYPE.lower() == 'mysql':
             conn = get_mysql_conn()
             cur = conn.cursor(dictionary=True)

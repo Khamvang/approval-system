@@ -169,7 +169,7 @@ def init_mysql(host, port, user, password, db_name):
         except Exception:
             pass
     try:
-            cur.execute('INSERT INTO users (email, password_hash, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', (
+        cur.execute('INSERT INTO users (email, password_hash, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', (
             'admin@example.com',
             generate_password_hash('admin123'),
             'Admin',
