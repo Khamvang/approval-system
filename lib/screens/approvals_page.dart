@@ -31,6 +31,58 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   int _selectedIndex = 1;
   String? _language;
   int _timeoutMinutes = 30;
+  // Approval Center state and sample data
+  final Map<String, List<String>> _centerSections = {
+    'To-do': ['System Modification Ringi', 'Expense Approval Ringi', 'Close Contract Approval Ringi'],
+    'Done': ['Open Contract Approval Ringi'],
+    'CC': ['Clock-in/out Correction'],
+    'Submitted': ['System Modification Ringi'],
+  };
+
+  final Map<String, List<Map<String, String>>> _sampleCases = {
+    'System Modification Ringi': List.generate(6, (i) => {
+      'id': 'SMR-${1000 + i}',
+      'title': 'System Modification Request #${i + 1}',
+      'subtitle': 'Requester ${i + 1}',
+      'status': i % 3 == 0 ? 'Under Review' : (i % 3 == 1 ? 'Pending' : 'Completed'),
+      'time': '${i + 1}h ago'
+    }),
+    'Expense Approval Ringi': List.generate(4, (i) => {
+      'id': 'EAR-${2000 + i}',
+      'title': 'Expense Approval #${i + 1}',
+      'subtitle': 'Employee ${i + 1}',
+      'status': 'Pending',
+      'time': '${i + 2}h ago'
+    }),
+    'Close Contract Approval Ringi': List.generate(5, (i) => {
+      'id': 'CCR-${3000 + i}',
+      'title': 'Close Contract #${i + 1}',
+      'subtitle': 'Person ${i + 1}',
+      'status': 'Pending',
+      'time': '${i + 3}h ago'
+    }),
+    'Open Contract Approval Ringi': List.generate(2, (i) => {
+      'id': 'OCR-${4000 + i}',
+      'title': 'Open Contract #${i + 1}',
+      'subtitle': 'Requester ${i + 1}',
+      'status': 'Completed',
+      'time': '${i + 4}h ago'
+    }),
+    'Clock-in/out Correction': List.generate(3, (i) => {
+      'id': 'CIC-${5000 + i}',
+      'title': 'Clock Correction #${i + 1}',
+      'subtitle': 'Staff ${i + 1}',
+      'status': 'CC',
+      'time': '${i + 1}d ago'
+    }),
+  };
+
+  String _selectedCenterSection = 'To-do';
+  String _selectedCenterApp = 'System Modification Ringi';
+  Map<String, String>? _selectedCase;
+  // resizable panels
+  double _leftPanelWidth = 260;
+  double _rightPanelWidth = 520;
 
   @override
   void initState() {
@@ -72,11 +124,11 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.all(16.0),
-                        child: Row(
+                            child: Row(
                           children: [
                             Image.asset('assets/images/lalco_logo.png', height: 36),
                             const SizedBox(width: 8),
-                            const Expanded(child: Text('LALCO', style: TextStyle(fontWeight: FontWeight.bold))),
+                            Expanded(child: SelectableText('LALCO', style: const TextStyle(fontWeight: FontWeight.bold))),
                           ],
                         ),
                       ),
@@ -101,7 +153,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                     child: Row(
                       children: [
                         const SizedBox(width: 8),
-                        const Text('Approvals', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        SelectableText('Approvals', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const Spacer(),
                         Row(
                           children: [
@@ -132,7 +184,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                   // Tabs
                   Material(
                     color: Colors.white,
-                    child: TabBar(
+                        child: TabBar(
                       tabs: const [
                         Tab(text: 'Submit Request'),
                         Tab(text: 'Approval Center'),
@@ -149,7 +201,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                       children: [
                         _buildMainContent(context),
                         _buildApprovalCenter(),
-                        Center(child: Padding(padding: const EdgeInsets.all(24.0), child: Column(mainAxisSize: MainAxisSize.min, children: const [Text('Data Management', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), SizedBox(height: 12), Text('Data management tools and imports/exports will appear here.')] ))),
+                        Center(child: Padding(padding: const EdgeInsets.all(24.0), child: Column(mainAxisSize: MainAxisSize.min, children: [SelectableText('Data Management', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 12), SelectableText('Data management tools and imports/exports will appear here.')] ))),
                       ],
                     ),
                   ),
@@ -163,38 +215,222 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   }
 
   Widget _buildApprovalCenter() {
-    return DefaultTabController(
-      length: 4,
-      child: Column(
-        children: [
-          Material(
-            color: Colors.white,
-            child: TabBar(
-              tabs: const [
-                Tab(text: 'To-do'),
-                Tab(text: 'Done'),
-                Tab(text: 'CC'),
-                Tab(text: 'Submitted'),
-              ],
-              labelColor: Colors.indigo,
-              unselectedLabelColor: Colors.black87,
-              indicatorColor: Colors.indigo,
-              isScrollable: true,
+    // Approval Center: three-column layout (sections/apps list / cases list / details)
+    final sectionList = _centerSections.keys.toList();
+    // ensure selected app exists for selected section
+    final appsForSection = _centerSections[_selectedCenterSection] ?? [];
+    if (!appsForSection.contains(_selectedCenterApp) && appsForSection.isNotEmpty) {
+      _selectedCenterApp = appsForSection.first;
+      _selectedCase = null;
+    }
+
+    final cases = _sampleCases[_selectedCenterApp] ?? [];
+
+    return LayoutBuilder(builder: (context, constraints) {
+      final total = constraints.maxWidth;
+      const minMiddle = 220.0;
+      const minLeft = 180.0;
+      const minRight = 200.0;
+
+      // clamp widths to sensible ranges so panels never overlap
+      _leftPanelWidth = _leftPanelWidth.clamp(minLeft, total - _rightPanelWidth - minMiddle - 16);
+      _rightPanelWidth = _rightPanelWidth.clamp(minRight, total - _leftPanelWidth - minMiddle - 16);
+
+      final middleWidth = (total - _leftPanelWidth - _rightPanelWidth - 16).clamp(minMiddle, double.infinity);
+
+      // Left panel
+      final leftPanel = Container(
+        color: Colors.white,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(padding: const EdgeInsets.all(12.0), child: TextField(decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: 'Search', border: OutlineInputBorder(borderRadius: BorderRadius.circular(6.0))))),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.all(8),
+                itemCount: sectionList.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, si) {
+                  final section = sectionList[si];
+                  final apps = _centerSections[section] ?? [];
+                  final expanded = section == _selectedCenterSection;
+                  return Material(
+                    color: expanded ? Colors.indigo.withAlpha(20) : Colors.transparent,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        InkWell(
+                          onTap: () => setState(() {
+                            _selectedCenterSection = section;
+                            _selectedCenterApp = apps.isNotEmpty ? apps.first : '';
+                            _selectedCase = null;
+                          }),
+                            child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
+                            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [SelectableText(section, style: TextStyle(fontWeight: FontWeight.bold, color: expanded ? Colors.indigo : Colors.black87)), Text('${apps.length}')]),
+                          ),
+                        ),
+                        if (expanded)
+                          Column(
+                            children: apps.map((a) {
+                              final sel = a == _selectedCenterApp;
+                                return ListTile(
+                                dense: true,
+                                title: SelectableText(a, style: TextStyle(color: sel ? Colors.indigo : Colors.black87)),
+                                onTap: () => setState(() {
+                                  _selectedCenterApp = a;
+                                  _selectedCase = null;
+                                }),
+                                selected: sel,
+                                selectedTileColor: Colors.indigo.withAlpha(30),
+                              );
+                            }).toList(),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
+          ],
+        ),
+      );
+
+      // Middle panel
+      final middlePanel = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(padding: const EdgeInsets.all(12), color: Colors.white, child: Row(children: [SelectableText(_selectedCenterApp, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), const Spacer(), DropdownButton<String>(value: 'All Time', items: const [DropdownMenuItem(value: 'All Time', child: Text('All Time'))], onChanged: (_) {})])),
           Expanded(
-            child: TabBarView(
-              children: [
-                _buildApprovalListPlaceholder('To-do'),
-                _buildApprovalListPlaceholder('Done'),
-                _buildApprovalListPlaceholder('CC'),
-                _buildApprovalListPlaceholder('Submitted'),
-              ],
+            child: Container(
+              color: const Color(0xFFF6F7FB),
+              padding: const EdgeInsets.all(12),
+              child: ListView.separated(
+                itemCount: cases.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, i) {
+                  final c = cases[i];
+                  final selected = _selectedCase != null && _selectedCase!['id'] == c['id'];
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedCase = c),
+                          child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: selected ? Colors.white : Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: selected ? Colors.indigo : Colors.grey.shade300)),
+                      child: Row(
+                        children: [
+                          Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.pink.shade400, borderRadius: BorderRadius.circular(6)), child: const Icon(Icons.person, color: Colors.white)),
+                          const SizedBox(width: 12),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [SelectableText(c['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)), const SizedBox(height: 4), SelectableText(c['subtitle'] ?? '', style: const TextStyle(color: Colors.grey))])),
+                          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(c['status'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(c['time'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 12))]),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ],
-      ),
-    );
+      );
+
+      // Right panel
+      final rightPanel = Container(
+        color: Colors.white,
+        child: _selectedCase == null
+            ? Center(child: Padding(padding: const EdgeInsets.all(24.0), child: Column(mainAxisSize: MainAxisSize.min, children: [SelectableText('Select a case to view details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8), SelectableText('Case details will appear here.')])) )
+            : Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  SelectableText(_selectedCase!['title'] ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Row(children: [Container(width: 36, height: 36, decoration: BoxDecoration(color: Colors.pink.shade400, borderRadius: BorderRadius.circular(6)), child: const Icon(Icons.person, color: Colors.white)), const SizedBox(width: 8), SelectableText(_selectedCase!['subtitle'] ?? '')]),
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  SelectableText('Details', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  SelectableText('ID: ${'' /* placeholder for id */}${_selectedCase!['id'] ?? ''}'),
+                  const SizedBox(height: 8),
+                  SelectableText('Status: ${_selectedCase!['status'] ?? ''}'),
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                    ElevatedButton.icon(onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Approve clicked')));
+                    }, icon: const Icon(Icons.check), label: const Text('Approve')),
+
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reject clicked')));
+                      },
+                      icon: const Icon(Icons.close, color: Colors.red),
+                      label: const Text('Reject', style: TextStyle(color: Colors.red)),
+                      style: OutlinedButton.styleFrom(side: BorderSide(color: Colors.red.shade200)),
+                    ),
+
+                    TextButton.icon(
+                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Group Chat'))),
+                      icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                      label: const Text('Group Chat'),
+                    ),
+
+                    TextButton.icon(
+                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('CC'))),
+                      icon: const Icon(Icons.alternate_email, size: 18),
+                      label: const Text('CC'),
+                    ),
+
+                    TextButton.icon(
+                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Transfer'))),
+                      icon: const Icon(Icons.swap_horiz, size: 18),
+                      label: const Text('Transfer'),
+                    ),
+
+                    TextButton.icon(
+                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add Approver'))),
+                      icon: const Icon(Icons.person_add_alt_1, size: 18),
+                      label: const Text('Add Approver'),
+                    ),
+
+                    TextButton.icon(
+                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Send Back'))),
+                      icon: const Icon(Icons.reply, size: 18),
+                      label: const Text('Send Back'),
+                    ),
+                  ]),
+                ]),
+              ),
+      );
+
+      return Row(
+        children: [
+          SizedBox(width: _leftPanelWidth, child: leftPanel),
+          MouseRegion(
+            cursor: SystemMouseCursors.resizeLeftRight,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onPanUpdate: (d) => setState(() {
+                _leftPanelWidth = (_leftPanelWidth + d.delta.dx).clamp(minLeft, total - _rightPanelWidth - minMiddle - 16);
+              }),
+              child: Container(width: 8, color: Colors.transparent, child: Center(child: Container(width: 2, height: double.infinity, color: Colors.grey.shade300))),
+            ),
+          ),
+          SizedBox(width: middleWidth, child: middlePanel),
+          MouseRegion(
+            cursor: SystemMouseCursors.resizeLeftRight,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onPanUpdate: (d) => setState(() {
+                _rightPanelWidth = (_rightPanelWidth - d.delta.dx).clamp(minRight, total - _leftPanelWidth - minMiddle - 16);
+              }),
+              child: Container(width: 8, color: Colors.transparent, child: Center(child: Container(width: 2, height: double.infinity, color: Colors.grey.shade300))),
+            ),
+          ),
+          SizedBox(width: _rightPanelWidth, child: rightPanel),
+        ],
+      );
+    });
   }
 
   Widget _buildApprovalListPlaceholder(String title) {
@@ -204,9 +440,9 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            SelectableText(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            Text('This is the $title list placeholder. Implement list and controls here.'),
+            SelectableText('This is the $title list placeholder. Implement list and controls here.'),
           ],
         ),
       ),
@@ -248,7 +484,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Recommended', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        SelectableText('Recommended', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
         SizedBox(
           height: 84,
@@ -268,11 +504,11 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                     borderRadius: BorderRadius.circular(6),
                     boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 1))],
                   ),
-                  child: Row(
+                      child: Row(
                     children: [
                       _pinkAvatar(),
                       const SizedBox(width: 12),
-                      Expanded(child: Text(title, style: const TextStyle(fontSize: 14))),
+                      Expanded(child: SelectableText(title, style: const TextStyle(fontSize: 14))),
                     ],
                   ),
                 ),
@@ -308,7 +544,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Provided by other service providers', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              SelectableText('Provided by other service providers', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
               Expanded(
                 child: LayoutBuilder(builder: (context, constraints) {
@@ -336,7 +572,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                             children: [
                               _pinkAvatar(),
                               const SizedBox(width: 12),
-                              Expanded(child: Text(title)),
+                              Expanded(child: SelectableText(title)),
                             ],
                           ),
                         ),
@@ -346,7 +582,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                 }),
               ),
               const SizedBox(height: 8),
-              Center(child: Text('All applications have been displayed', style: TextStyle(color: Colors.grey.shade600))),
+              Center(child: SelectableText('All applications have been displayed', style: TextStyle(color: Colors.grey.shade600))),
             ],
           ),
         ),
@@ -372,7 +608,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       onPressed: () => setState(() {
         _leftMenuSelected = title;
       }),
-      child: Text(title, style: TextStyle(color: selected ? Colors.blue : Colors.black87)),
+      child: SelectableText(title, style: TextStyle(color: selected ? Colors.blue : Colors.black87)),
     );
   }
 
@@ -389,8 +625,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(title),
-        content: const Text('This is a placeholder for the approval application. Implement specific flows here.'),
+        title: SelectableText(title),
+        content: SelectableText('This is a placeholder for the approval application. Implement specific flows here.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
           ElevatedButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Open')),
@@ -414,7 +650,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
           children: [
             Icon(icon, color: selected ? Colors.indigo : Colors.grey[700]),
             const SizedBox(width: 12),
-            Text(label, style: TextStyle(color: selected ? Colors.indigo : Colors.black87)),
+            SelectableText(label, style: TextStyle(color: selected ? Colors.indigo : Colors.black87)),
           ],
         ),
       ),

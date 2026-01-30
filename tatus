@@ -1,0 +1,5 @@
+[33m193be44[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature/approvals-page[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/feature/approvals-page[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #2 from Khamvang/feature/approvals-page
+[33mc3902b1[m feat: add Approvals page with Submit Request, Approval Center, Data Management; integrate sidebar and profile menu
+[33m89118b6[m[33m ([m[1;32mmain[m[33m)[m Save changes
+[33m5fb8286[m Session: persistent login, switch-account recent users, autofill remembered credentials, UI tweaks
+[33mdd48d8a[m Merge pull request #1 from Khamvang/feature/split-first-last-name
