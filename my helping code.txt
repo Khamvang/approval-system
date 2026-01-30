@@ -41,6 +41,8 @@ flutter run
 
 python app.py
 
+python init_db.py
+
 
 Log in and open the profile menu — it should display First + Last name and "StaffNo - Nickname" when those fields exist in the backend.
 If you still see email or a dash:
@@ -179,10 +181,38 @@ If you want to merge to main now:
     git branch -d feature/approvals-page
     git push origin --delete feature/approvals-page
 
+
+
+----------------
+Please test
+
+Rebuild/run the app:
+
+cd d:\Dev\Approval\approval\backend
+
+flutter clean
+flutter pub get
+flutter run
+
+python app.py
+
+
+
 ----------------------
 Pushing change to origin main GitHub
 
 
-cd d:/Dev/Approval/approval; git push origin main
+#To run git commands to inspect status, branch, and remotes.
+
+    git status --porcelain; git rev-parse --abbrev-ref HEAD; git remote -v
+
+
+#stage, commit, and push the current branch to origin on GitHub.
+
+    git add -A; git commit -m "Save changes"; git push origin main
+
+
+
+
 
 

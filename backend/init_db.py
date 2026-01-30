@@ -100,6 +100,59 @@ def init_sqlite(db_path='users.db'):
     except Exception:
         print('Sample user already exists or insertion failed')
     finally:
+        # Create tables for Close Contract Approval
+        cur.execute('''
+        CREATE TABLE IF NOT EXISTS close_contract_forms (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            collection_type TEXT,
+            contract_no TEXT NOT NULL,
+            person_in_charge TEXT,
+            manager_in_charge TEXT,
+            last_contract_info TEXT,
+            paid_term INTEGER,
+            total_term INTEGER,
+            full_paid_date TEXT,
+            s_count INTEGER,
+            a_count INTEGER,
+            b_count INTEGER,
+            c_count INTEGER,
+            f_count INTEGER,
+            principal_remaining REAL,
+            interest_remaining REAL,
+            penalty_remaining REAL,
+            others_remaining REAL,
+            principal_willing REAL,
+            interest_willing REAL,
+            interest_months INTEGER,
+            penalty_willing REAL,
+            others_willing REAL,
+            remark TEXT,
+            attachment_url TEXT,
+            status TEXT,
+            current_step TEXT,
+            created_by_email TEXT,
+            created_by_id INTEGER,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        ''')
+        cur.execute('''
+        CREATE TABLE IF NOT EXISTS close_contract_actions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            request_id INTEGER NOT NULL,
+            step_key TEXT NOT NULL,
+            step_label TEXT NOT NULL,
+            role TEXT,
+            result TEXT NOT NULL,
+            comment TEXT,
+            actor_email TEXT,
+            actor_id INTEGER,
+            actor_name TEXT,
+            acted_at TEXT,
+            FOREIGN KEY (request_id) REFERENCES close_contract_forms(id)
+        )
+        ''')
+        conn.commit()
         conn.close()
 
 
@@ -188,6 +241,60 @@ def init_mysql(host, port, user, password, db_name):
         print('Sample user already exists or insertion failed')
     finally:
         cur.close()
+        # Close Contract Approval tables
+        cur = conn.cursor()
+        cur.execute('''
+        CREATE TABLE IF NOT EXISTS close_contract_forms (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            collection_type VARCHAR(255),
+            contract_no VARCHAR(255) NOT NULL,
+            person_in_charge VARCHAR(255),
+            manager_in_charge VARCHAR(255),
+            last_contract_info TEXT,
+            paid_term INT,
+            total_term INT,
+            full_paid_date VARCHAR(64),
+            s_count INT,
+            a_count INT,
+            b_count INT,
+            c_count INT,
+            f_count INT,
+            principal_remaining DECIMAL(18,2),
+            interest_remaining DECIMAL(18,2),
+            penalty_remaining DECIMAL(18,2),
+            others_remaining DECIMAL(18,2),
+            principal_willing DECIMAL(18,2),
+            interest_willing DECIMAL(18,2),
+            interest_months INT,
+            penalty_willing DECIMAL(18,2),
+            others_willing DECIMAL(18,2),
+            remark TEXT,
+            attachment_url TEXT,
+            status VARCHAR(64),
+            current_step VARCHAR(64),
+            created_by_email VARCHAR(255),
+            created_by_id INT,
+            created_at VARCHAR(64),
+            updated_at VARCHAR(64)
+        )
+        ''')
+        cur.execute('''
+        CREATE TABLE IF NOT EXISTS close_contract_actions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            request_id INT NOT NULL,
+            step_key VARCHAR(64) NOT NULL,
+            step_label VARCHAR(255) NOT NULL,
+            role VARCHAR(255),
+            result VARCHAR(64) NOT NULL,
+            comment TEXT,
+            actor_email VARCHAR(255),
+            actor_id INT,
+            actor_name VARCHAR(255),
+            acted_at VARCHAR(64),
+            FOREIGN KEY (request_id) REFERENCES close_contract_forms(id)
+        )
+        ''')
+        conn.commit()
         conn.close()
 
 

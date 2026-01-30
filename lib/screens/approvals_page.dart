@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/session.dart';
+import 'close_contract_approval_page.dart';
 
 class ApprovalsPage extends StatefulWidget {
   const ApprovalsPage({Key? key}) : super(key: key);
@@ -434,22 +435,6 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     });
   }
 
-  Widget _buildApprovalListPlaceholder(String title) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SelectableText(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            SelectableText('This is the $title list placeholder. Implement list and controls here.'),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildMainContent(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -622,7 +607,14 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     );
   }
 
-  void _openApp(String title) {
+  Future<void> _openApp(String title) async {
+    if (title == 'Close Contract Approval Ringi') {
+      final user = await Session.loadUser();
+      if (!mounted) return;
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => CloseContractApprovalPage(user: user)));
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
