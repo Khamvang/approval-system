@@ -1,0 +1,69 @@
+Errors exist in your project
+
+
+I'll scan the modified Dart files and pubspec for syntax or import errors. I'll read them to check for common mistakes.
+
+I'll run flutter analyze in the project root to capture the exact analyzer errors.
+
+-----------------------
+
+
+flutter analyze
+
+PS D:\Dev\Approval\approval> flutter analyze
+
+
+
+------------
+Result
+
+The fatal analyzer error is resolved — flutter analyze now reports no errors (only infos/warnings).
+Remaining messages are informational (e.g., use_build_context_synchronously, deprecation notes in admin_users_widget.dart) and do not prevent running the app.
+How you can verify locally
+
+cd d:\Dev\Approval\approval
+flutter clean
+flutter pub get
+flutter analyze
+flutter run   # or `flutter run -d chrome` for web
+
+
+----------------
+Please test
+
+Rebuild/run the app:
+
+cd d:\Dev\Approval\approval
+flutter clean
+flutter pub get
+flutter run
+
+
+cd d:\Dev\Approval\approval\backend
+
+python app.py
+
+
+Log in and open the profile menu — it should display First + Last name and "StaffNo - Nickname" when those fields exist in the backend.
+If you still see email or a dash:
+
+Confirm the backend users table has first_name, last_name, staff_no, and nickname populated for that account.
+I can also update the app to proactively show a fallback (e.g., show 'Unknown' instead of '-') if you'd prefer. Which fallback would you like?
+
+--------------------
+cd d:\Dev\Approval\approval\backend
+
+python app.py
+
+-----------------
+
+
+flutter clean
+flutter pub get
+flutter run -d chrome
+
+---------------
+cd d:\Dev\Approval\approval\backend
+
+flutter pub get
+flutter run
