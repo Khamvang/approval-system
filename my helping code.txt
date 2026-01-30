@@ -33,13 +33,11 @@ Please test
 
 Rebuild/run the app:
 
-cd d:\Dev\Approval\approval
+cd d:\Dev\Approval\approval\backend
+
 flutter clean
 flutter pub get
 flutter run
-
-
-cd d:\Dev\Approval\approval\backend
 
 python app.py
 
@@ -67,3 +65,117 @@ cd d:\Dev\Approval\approval\backend
 
 flutter pub get
 flutter run
+
+
+------------------
+merge the code change to GitHub
+
+
+Option A — Quick GUI (recommended)
+
+1. Push your branch:
+
+    git checkout feature/approvals-page
+    git add .
+    git commit -m "feat(approvals): add Approvals page + Approval Center"
+    git push -u origin feature/approvals-page
+
+2. Open the repo on GitHub → you should see a "Compare & pull request" banner for your branch. Click it, paste the contents of PR_DESCRIPTION.md into the PR description, create the PR.
+3. On the PR page click "Squash and merge" (or your team's preferred merge method) → confirm → optionally delete the branch.
+4. Update local main:
+
+    git checkout main
+    git pull origin main
+
+
+Option B — Using GitHub CLI (gh) (fast, from terminal)
+
+
+1. Push branch:
+
+    git push -u origin feature/approvals-page
+
+2. Create a draft PR (this will open the web UI):
+
+    gh pr create --base main --head feature/approvals-page --title "feat(approvals): add Approvals page + Approval Center with resizable three-column layout" --body-file PR_DESCRIPTION.md --draft --web
+
+3. After review, merge the PR from CLI:
+
+    gh pr merge --squash --delete-branch
+
+4. Update local main:
+
+    git checkout main
+    git pull origin main
+
+
+Option C — Merge locally (only use if you must merge without PR)
+
+1. Ensure main is up-to-date:
+
+    git checkout main
+    git pull origin main
+
+2. Merge feature branch (resolve conflicts if any):
+
+    git merge --no-ff feature/approvals-page
+    # fix conflicts if prompted, then:
+    git add <fixed-files>
+    git commit
+    git push origin main
+
+3. Delete branch:
+
+    git branch -d feature/approvals-page
+    git push origin --delete feature/approvals-page
+
+
+
+-----------------------
+Do this to fix it and push the real changes up.
+
+#1. Go to the repo root and check status there
+
+    cd D:\Dev\Approval\approval
+    git status
+
+#2. Stage all changes from the repo root (safe)
+
+    git add -A
+
+#3. Commit
+
+    git commit -m "feat(approvals): add Approvals page + Approval Center and PR description"
+
+#If commit says "nothing to commit", re-run git status to confirm files are present.
+
+#4. Push the feature branch to origin
+
+    git push -u origin feature/approvals-page
+
+
+You should see output like:
+To github.com:Khamvang/approval-system.git
+
+- [new branch] feature/approvals-page -> feature/approvals-page
+or an update to the existing branch.
+Verify remotely (open in browser)
+
+
+5. Branch list: https://github.com/Khamvang/approval-system/branches
+- Compare: https://github.com/Khamvang/approval-system/compare/feature/approvals-page
+
+If you want to merge to main now:
+
+- Preferred: Create a PR on GitHub (use the PR_DESCRIPTION.md you added).
+- Quick local merge (if you must):
+
+    git checkout main
+    git pull origin main
+    git merge --no-ff feature/approvals-page
+    # fix conflicts if any, then
+    git push origin main
+    # delete branch locally and remotely if desired:
+    git branch -d feature/approvals-page
+    git push origin --delete feature/approvals-page
+

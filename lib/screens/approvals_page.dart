@@ -80,9 +80,9 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   String _selectedCenterSection = 'To-do';
   String _selectedCenterApp = 'System Modification Ringi';
   Map<String, String>? _selectedCase;
-  // resizable panels
-  double _leftPanelWidth = 260;
-  double _rightPanelWidth = 520;
+  // resizable panels with default widths: left 300px, middle 350px; right auto-fills remainder
+  double _leftPanelWidth = 300;
+  double _middlePanelWidth = 350;
 
   @override
   void initState() {
@@ -228,15 +228,16 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
 
     return LayoutBuilder(builder: (context, constraints) {
       final total = constraints.maxWidth;
-      const minMiddle = 220.0;
-      const minLeft = 180.0;
-      const minRight = 200.0;
+      const minLeft = 200.0;
+      const minMiddle = 260.0;
+      const minRight = 240.0;
+      const gutter = 16.0; // two 8px drag handles
 
-      // clamp widths to sensible ranges so panels never overlap
-      _leftPanelWidth = _leftPanelWidth.clamp(minLeft, total - _rightPanelWidth - minMiddle - 16);
-      _rightPanelWidth = _rightPanelWidth.clamp(minRight, total - _leftPanelWidth - minMiddle - 16);
+      // Clamp widths to keep panels visible and leave room for the right pane.
+      _leftPanelWidth = _leftPanelWidth.clamp(minLeft, total - _middlePanelWidth - minRight - gutter);
+      _middlePanelWidth = _middlePanelWidth.clamp(minMiddle, total - _leftPanelWidth - minRight - gutter);
 
-      final middleWidth = (total - _leftPanelWidth - _rightPanelWidth - 16).clamp(minMiddle, double.infinity);
+      final rightWidth = (total - _leftPanelWidth - _middlePanelWidth - gutter).clamp(minRight, double.infinity);
 
       // Left panel
       final leftPanel = Container(
@@ -411,23 +412,23 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
               onPanUpdate: (d) => setState(() {
-                _leftPanelWidth = (_leftPanelWidth + d.delta.dx).clamp(minLeft, total - _rightPanelWidth - minMiddle - 16);
+                _leftPanelWidth = (_leftPanelWidth + d.delta.dx).clamp(minLeft, total - _middlePanelWidth - minRight - gutter);
               }),
               child: Container(width: 8, color: Colors.transparent, child: Center(child: Container(width: 2, height: double.infinity, color: Colors.grey.shade300))),
             ),
           ),
-          SizedBox(width: middleWidth, child: middlePanel),
+          SizedBox(width: _middlePanelWidth, child: middlePanel),
           MouseRegion(
             cursor: SystemMouseCursors.resizeLeftRight,
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
               onPanUpdate: (d) => setState(() {
-                _rightPanelWidth = (_rightPanelWidth - d.delta.dx).clamp(minRight, total - _leftPanelWidth - minMiddle - 16);
+                _middlePanelWidth = (_middlePanelWidth + d.delta.dx).clamp(minMiddle, total - _leftPanelWidth - minRight - gutter);
               }),
               child: Container(width: 8, color: Colors.transparent, child: Center(child: Container(width: 2, height: double.infinity, color: Colors.grey.shade300))),
             ),
           ),
-          SizedBox(width: _rightPanelWidth, child: rightPanel),
+          SizedBox(width: rightWidth, child: rightPanel),
         ],
       );
     });
