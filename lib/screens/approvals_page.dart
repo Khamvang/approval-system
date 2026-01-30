@@ -80,8 +80,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   String _selectedCenterSection = 'To-do';
   String _selectedCenterApp = 'System Modification Ringi';
   Map<String, String>? _selectedCase;
-  // resizable panels with default widths: left 300px, middle 350px; right auto-fills remainder
-  double _leftPanelWidth = 300;
+  // resizable panels with default widths: left 250px, middle 350px; right auto-fills remainder ..
+  double _leftPanelWidth = 250;
   double _middlePanelWidth = 350;
 
   @override

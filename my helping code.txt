@@ -179,3 +179,10 @@ If you want to merge to main now:
     git branch -d feature/approvals-page
     git push origin --delete feature/approvals-page
 
+----------------------
+Pushing change to origin main GitHub
+
+
+cd d:/Dev/Approval/approval; git push origin main
+
+
