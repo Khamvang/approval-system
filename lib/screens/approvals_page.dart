@@ -635,23 +635,14 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                         ),
                       ),
 
-                      // Approval Record tab
+                      // Approval Record tab: render a table with Step Name, Approver, Result, Comments, Time
                       SingleChildScrollView(
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             const SizedBox(height: 4),
-                            if (((_selectedCase!['actions'] ?? _selectedCase!['approval_records']) ?? []).isEmpty)
-                              const Text('No approval records available', style: TextStyle(color: Colors.grey))
-                            else
-                              for (final a in ((_selectedCase!['actions'] ?? _selectedCase!['approval_records']) as List))
-                                ListTile(
-                                  dense: true,
-                                  title: Text(a is Map ? (a['action'] ?? a['type'] ?? a.toString()).toString() : a.toString()),
-                                  subtitle: Text(a is Map ? (a['by'] ?? a['actor'] ?? '').toString() : ''),
-                                  trailing: Text(a is Map ? (a['at'] ?? a['timestamp'] ?? '').toString() : ''),
-                                ),
+                            _buildApprovalRecordTable(((_selectedCase!['actions'] ?? _selectedCase!['approval_records']) ?? []) as List),
                           ],
                         ),
                       ),
@@ -1059,6 +1050,103 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       if (u != null && u.pathSegments.isNotEmpty) return u.pathSegments.last;
     } catch (_) {}
     return url;
+  }
+
+  Widget _buildApprovalRecordTable(List actions) {
+    if (actions.isEmpty) {
+      return const Text('No approval records available', style: TextStyle(color: Colors.grey));
+    }
+
+    List<TableRow> rows = [];
+    // header
+    rows.add(TableRow(children: [
+      Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text('Step Name', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]))),
+      Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text('Approver', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]))),
+      Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text('Result', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]))),
+      Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text('Comments', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]))),
+      Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text('Time', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]))),
+    ]));
+
+    for (final aRaw in actions) {
+      final a = aRaw is Map ? Map<String, dynamic>.from(aRaw) : {'result': aRaw.toString()};
+      final stepName = (a['step_label'] ?? a['step'] ?? a['action'] ?? a['type'] ?? '').toString();
+      final approverName = (a['actor_name'] ?? a['actor'] ?? a['by'] ?? a['actor_email'] ?? '').toString();
+      final approverRole = (a['role'] ?? '').toString();
+      final result = (a['result'] ?? '').toString();
+      final comment = (a['comment'] ?? a['comments'] ?? a['remark'] ?? '').toString();
+      final actedAt = (a['acted_at'] ?? a['at'] ?? a['timestamp'] ?? a['created_at'] ?? '').toString();
+
+      rows.add(TableRow(children: [
+        Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: SelectableText(stepName)),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Row(children: [
+            _approverAvatar(approverName),
+            const SizedBox(width: 8),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [SelectableText(approverName.isNotEmpty ? approverName : approverRole.isNotEmpty ? approverRole : '-'), if (approverRole.isNotEmpty) Text(approverRole, style: const TextStyle(color: Colors.grey, fontSize: 12))])),
+          ]),
+        ),
+        Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: _resultBadge(result)),
+        Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: SelectableText(comment.isNotEmpty ? comment : '-', maxLines: 4)),
+        Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text(_formatDateTime(actedAt), style: const TextStyle(color: Colors.grey, fontSize: 12))),
+      ]));
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Table(
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        columnWidths: const {
+          0: IntrinsicColumnWidth(),
+          1: FixedColumnWidth(260),
+          2: IntrinsicColumnWidth(),
+          3: FixedColumnWidth(360),
+          4: IntrinsicColumnWidth(),
+        },
+        children: rows,
+      ),
+    );
+  }
+
+  Widget _approverAvatar(String nameOrEmail) {
+    final s = (nameOrEmail ?? '').toString();
+    String initials = '';
+    if (s.isNotEmpty) {
+      final parts = s.split(RegExp(r'[\s@._-]+')).where((p) => p.isNotEmpty).toList();
+      if (parts.length >= 2) {
+        initials = '${parts[0][0].toUpperCase()}${parts[1][0].toUpperCase()}';
+      } else if (parts.isNotEmpty) {
+        initials = parts[0].substring(0, 1).toUpperCase();
+      }
+    }
+    return CircleAvatar(radius: 16, backgroundColor: Colors.pink.shade400, child: Text(initials, style: const TextStyle(color: Colors.white, fontSize: 12)));
+  }
+
+  Widget _resultBadge(String result) {
+    final r = (result ?? '').toString().toLowerCase();
+    Color bg = Colors.grey.shade200;
+    Color fg = Colors.black87;
+    if (r.contains('approve') || r == 'approved') {
+      bg = Colors.green.shade100;
+      fg = Colors.green.shade800;
+    } else if (r.contains('submitted') || r == 'submitted') {
+      bg = Colors.green.shade50;
+      fg = Colors.green.shade800;
+    } else if (r.contains('review') || r.contains('under_review') || r.contains('under review')) {
+      bg = Colors.blue.shade50;
+      fg = Colors.blue.shade800;
+    } else if (r.contains('send') || r.contains('sent_back') || r.contains('send_back')) {
+      bg = Colors.orange.shade100;
+      fg = Colors.orange.shade800;
+    } else if (r.contains('reject') || r == 'rejected') {
+      bg = Colors.red.shade100;
+      fg = Colors.red.shade800;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+      child: Text(result.isNotEmpty ? result[0].toUpperCase() + result.substring(1) : '-', style: TextStyle(color: fg, fontWeight: FontWeight.w600, fontSize: 12)),
+    );
   }
 
   Future<void> _showAttachmentPreview(String rawUrl) async {
