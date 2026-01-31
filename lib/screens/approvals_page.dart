@@ -410,7 +410,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                           Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.pink.shade400, borderRadius: BorderRadius.circular(6)), child: const Icon(Icons.person, color: Colors.white)),
                           const SizedBox(width: 12),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [SelectableText(c['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)), const SizedBox(height: 4), SelectableText(c['subtitle'] ?? '', style: const TextStyle(color: Colors.grey))])),
-                          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(c['status'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(c['time'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 12))]),
+                          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(c['status'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_relativeTime(c['created_at'] ?? c['time']), style: const TextStyle(color: Colors.grey, fontSize: 12))]),
                         ],
                       ),
                     ),
@@ -931,6 +931,33 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     }
   }
 
+  String _relativeTime(dynamic src) {
+    if (src == null) return '';
+    DateTime dt;
+    try {
+      if (src is DateTime) {
+        dt = src.toLocal();
+      } else {
+        dt = DateTime.tryParse(src.toString())?.toLocal() ?? DateTime.fromMillisecondsSinceEpoch(0);
+      }
+    } catch (_) {
+      return src.toString();
+    }
+
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inSeconds < 60) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} minute${diff.inMinutes == 1 ? '' : 's'} ago';
+    if (diff.inHours < 24) return '${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
+    if (diff.inDays < 30) return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+    // fallback to short date
+    try {
+      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return src.toString();
+    }
+  }
+
   // Format numeric amounts with thousand separators while preserving decimals.
   String _formatAmount(dynamic v) {
     if (v == null) return '';
@@ -1057,16 +1084,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       return const Text('No approval records available', style: TextStyle(color: Colors.grey));
     }
 
-    List<TableRow> rows = [];
-    // header
-    rows.add(TableRow(children: [
-      Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text('Step Name', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]))),
-      Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text('Approver', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]))),
-      Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text('Result', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]))),
-      Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text('Comments', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]))),
-      Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text('Time', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]))),
-    ]));
-
+    List<Widget> cards = [];
+    int ri = 0;
     for (final aRaw in actions) {
       final a = aRaw is Map ? Map<String, dynamic>.from(aRaw) : {'result': aRaw.toString()};
       final stepName = (a['step_label'] ?? a['step'] ?? a['action'] ?? a['type'] ?? '').toString();
@@ -1076,36 +1095,64 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       final comment = (a['comment'] ?? a['comments'] ?? a['remark'] ?? '').toString();
       final actedAt = (a['acted_at'] ?? a['at'] ?? a['timestamp'] ?? a['created_at'] ?? '').toString();
 
-      rows.add(TableRow(children: [
-        Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: SelectableText(stepName)),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+      // color accent
+      final rl = result.toLowerCase();
+      Color accent;
+      if (rl.contains('approve')) {
+        accent = Colors.green.shade400;
+      } else if (rl.contains('submitted')) {
+        accent = Colors.blue.shade400;
+      } else if (rl.contains('reject')) {
+        accent = Colors.red.shade400;
+      } else if (rl.contains('send') || rl.contains('sent_back')) {
+        accent = Colors.orange.shade400;
+      } else if (rl.contains('review') || rl.contains('under_review') || rl.contains('under review')) {
+        accent = Colors.indigo.shade400;
+      } else {
+        accent = ri % 2 == 0 ? Colors.grey.shade200 : Colors.grey.shade100;
+      }
+
+      cards.add(Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6.0),
+        child: Container(
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2))]),
           child: Row(children: [
-            _approverAvatar(approverName),
-            const SizedBox(width: 8),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [SelectableText(approverName.isNotEmpty ? approverName : approverRole.isNotEmpty ? approverRole : '-'), if (approverRole.isNotEmpty) Text(approverRole, style: const TextStyle(color: Colors.grey, fontSize: 12))])),
+            Container(width: 6, height: 86, decoration: BoxDecoration(color: accent, borderRadius: const BorderRadius.only(topLeft: Radius.circular(8), bottomLeft: Radius.circular(8)))),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 12.0),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _approverAvatar(approverName),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(stepName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      Text(approverName.isNotEmpty ? approverName : (approverRole.isNotEmpty ? approverRole : '-'), style: const TextStyle(color: Colors.grey)),
+                      if (comment.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(comment, style: const TextStyle(), maxLines: 3, overflow: TextOverflow.ellipsis),
+                      ],
+                    ]),
+                  ),
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    _resultBadge(result),
+                    const SizedBox(height: 8),
+                    Text(_relativeTime(actedAt), style: const TextStyle(color: Colors.grey)),
+                    const SizedBox(height: 4),
+                    Text(_formatDateTime(actedAt), style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                  ])
+                ]),
+              ),
+            ),
           ]),
         ),
-        Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: _resultBadge(result)),
-        Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: SelectableText(comment.isNotEmpty ? comment : '-', maxLines: 4)),
-        Padding(padding: const EdgeInsets.symmetric(vertical: 8.0), child: Text(_formatDateTime(actedAt), style: const TextStyle(color: Colors.grey, fontSize: 12))),
-      ]));
+      ));
+
+      ri++;
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Table(
-        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-        columnWidths: const {
-          0: IntrinsicColumnWidth(),
-          1: FixedColumnWidth(260),
-          2: IntrinsicColumnWidth(),
-          3: FixedColumnWidth(360),
-          4: IntrinsicColumnWidth(),
-        },
-        children: rows,
-      ),
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: cards);
   }
 
   Widget _approverAvatar(String nameOrEmail) {
