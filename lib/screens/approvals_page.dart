@@ -121,8 +121,32 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
           m['title'] = m['contract_no'] ?? m['title'] ?? '';
           m['subtitle'] = m['person_in_charge'] ?? m['created_by_name'] ?? '';
           m['status'] = m['status'] ?? '';
-          // prefer the last update datetime for listing and relative time calculations
-          m['time'] = m['updated_at'] ?? m['created_at'] ?? '';
+          // determine the last submit datetime from actions (prefer submit/resubmit actions)
+          DateTime? lastSubmit;
+          try {
+            final actions = (m['actions'] as List?) ?? [];
+            for (final a in actions.reversed) {
+              final key = (a is Map) ? (a['step_key'] ?? a['step'] ?? '') : '';
+              if (key == 'submit' || (a is Map && (a['step_label'] ?? '').toString().toLowerCase() == 'submit')) {
+                final acted = a is Map ? (a['acted_at'] ?? a['at'] ?? a['timestamp'] ?? a['created_at']) : null;
+                if (acted != null) {
+                  try {
+                    lastSubmit = DateTime.tryParse(acted.toString())?.toLocal();
+                    if (lastSubmit != null) break;
+                  } catch (_) {}
+                }
+              }
+            }
+          } catch (_) {
+            lastSubmit = null;
+          }
+          if (lastSubmit != null) {
+            m['last_submit_at'] = lastSubmit.toIso8601String();
+            m['time'] = m['last_submit_at'];
+          } else {
+            // fallback to updated or created
+            m['time'] = m['updated_at'] ?? m['created_at'] ?? '';
+          }
           return m;
         }).toList();
       });
@@ -281,6 +305,19 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       cases = (_sampleCases[_selectedCenterApp] ?? []).map((m) => m.map((k, v) => MapEntry(k, v))).toList();
     }
 
+    // sort cases by last update datetime (prefer updated_at, then created_at, then time)
+    DateTime _parseCaseTime(Map<String, dynamic> c) {
+      final src = c['last_submit_at'] ?? c['updated_at'] ?? c['created_at'] ?? c['time'];
+      if (src == null) return DateTime.fromMillisecondsSinceEpoch(0);
+      try {
+        if (src is DateTime) return src.toLocal();
+        return DateTime.tryParse(src.toString())?.toLocal() ?? DateTime.fromMillisecondsSinceEpoch(0);
+      } catch (_) {
+        return DateTime.fromMillisecondsSinceEpoch(0);
+      }
+    }
+    cases.sort((a, b) => _parseCaseTime(b).compareTo(_parseCaseTime(a)));
+
     return LayoutBuilder(builder: (context, constraints) {
       final total = constraints.maxWidth;
       const minLeft = 200.0;
@@ -424,7 +461,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                           Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.pink.shade400, borderRadius: BorderRadius.circular(6)), child: const Icon(Icons.person, color: Colors.white)),
                           const SizedBox(width: 12),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [SelectableText(c['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)), const SizedBox(height: 4), SelectableText(c['subtitle'] ?? '', style: const TextStyle(color: Colors.grey))])),
-                          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(c['status'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_relativeTime(c['updated_at'] ?? c['created_at'] ?? c['time']), style: const TextStyle(color: Colors.grey, fontSize: 12))]),
+                          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(c['status'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_relativeTime(c['last_submit_at'] ?? c['updated_at'] ?? c['created_at'] ?? c['time']), style: const TextStyle(color: Colors.grey, fontSize: 12))]),
                         ],
                       ),
                     ),
