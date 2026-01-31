@@ -493,30 +493,58 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                                 _buildKeyValueRow('Lasted contract information', '${_selectedCase!['last_contract_info'] ?? ''}'),
                                 if (_paidTermRatio(_selectedCase!).isNotEmpty) _buildKeyValueRow('Paid Term / Total Term', _paidTermRatio(_selectedCase!)),
                                 _buildKeyValueRow('Full paid date (or first due date if unpaid)', '${_selectedCase!['full_paid_date'] ?? ''}'),
-                                if ((_selectedCase!['remark'] ?? '').toString().isNotEmpty) _buildKeyValueRow('Remark', '${_selectedCase!['remark']}'),
                               ],
                             ),
-                            const SizedBox(height: 12),
-                            if (((_selectedCase!['payment_history'] ?? []) as List).isNotEmpty) ...[
-                              const Text('Payment History', style: TextStyle(fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
+                            const SizedBox(height: 8),
+                            // render schedule-style payment history from DB fields when available
+                            if ((_selectedCase!['s_count'] != null) || (_selectedCase!['a_count'] != null) || (_selectedCase!['b_count'] != null) || (_selectedCase!['c_count'] != null) || (_selectedCase!['f_count'] != null)) ...[
+                              const Text('Payment history', style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
                               SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
                                 child: DataTable(
+                                  headingRowHeight: 28,
+                                  dataRowHeight: 28,
+                                  horizontalMargin: 28,
+                                  columnSpacing: 28,
                                   columns: const [
-                                    DataColumn(label: Text('Date')),
-                                    DataColumn(label: Text('Amount')),
-                                    DataColumn(label: Text('Note')),
+                                    DataColumn(label: Text('S at 5th(time)')),
+                                    DataColumn(label: Text('A at 10th(time)')),
+                                    DataColumn(label: Text('B at 20th(time)')),
+                                    DataColumn(label: Text('C at 31st(time)')),
+                                    DataColumn(label: Text('F after 1 month(time)')),
                                   ],
-                                  rows: (_selectedCase!['payment_history'] as List).map((ph) {
-                                    final date = (ph is Map && (ph['date'] ?? ph['created_at']) != null) ? (ph['date'] ?? ph['created_at']).toString() : ph.toString();
-                                    final amount = (ph is Map && (ph['amount'] ?? ph['amount_paid']) != null) ? (ph['amount'] ?? ph['amount_paid']).toString() : '';
-                                    final note = (ph is Map && (ph['note'] ?? ph['description']) != null) ? (ph['note'] ?? ph['description']).toString() : ph.toString();
-                                    return DataRow(cells: [DataCell(Text(date)), DataCell(Text(amount)), DataCell(Text(note))]);
-                                  }).toList(),
+                                  rows: [
+                                    DataRow(cells: [
+                                      DataCell(Text('${_selectedCase!['s_count'] ?? ''}')),
+                                      DataCell(Text('${_selectedCase!['a_count'] ?? ''}')),
+                                      DataCell(Text('${_selectedCase!['b_count'] ?? ''}')),
+                                      DataCell(Text('${_selectedCase!['c_count'] ?? ''}')),
+                                      DataCell(Text('${_selectedCase!['f_count'] ?? ''}')),
+                                    ])
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 8),
+                            ],
+                            // Remark after payment history — render as larger readable block
+                            if ((_selectedCase!['remark'] ?? '').toString().isNotEmpty) ...[
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8.0, bottom: 12.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SelectableText('Remark', style: TextStyle(color: Colors.grey)),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12.0),
+                                      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(6)),
+                                      child: SelectableText('${_selectedCase!['remark']}', style: const TextStyle(height: 1.4)),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ],
                         ),
@@ -797,11 +825,11 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     return TableRow(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          padding: const EdgeInsets.symmetric(vertical: 6.0),
           child: SelectableText(key, style: const TextStyle(color: Colors.grey)),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          padding: const EdgeInsets.symmetric(vertical: 6.0),
           child: SelectableText(value),
         ),
       ],
