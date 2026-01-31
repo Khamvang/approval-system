@@ -23,7 +23,7 @@ python init_db.py
 
 
 ----------------------------
-Pushing change to origin main GitHub
+# Pushing change to origin main GitHub
 
 
 #To run git commands to inspect status, branch, and remotes.
@@ -33,7 +33,7 @@ Pushing change to origin main GitHub
 
 #stage, commit, and push the current branch to origin on GitHub.
 
-    git add -A; git commit -m "Updated Approve Reject and Send Bank"; git push origin main
+    git add -A; git commit -m "Updated Approval details form"; git push origin main
 
 
 ----------------------------

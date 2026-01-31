@@ -527,6 +527,42 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                               ),
                               const SizedBox(height: 8),
                             ],
+                            // Remaining Amount (from DB)
+                            if ((_selectedCase!['principal_remaining'] != null) || (_selectedCase!['interest_remaining'] != null) || (_selectedCase!['penalty_remaining'] != null) || (_selectedCase!['others_remaining'] != null)) ...[
+                              const SizedBox(height: 6),
+                              const SelectableText('Remaining Amount', style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              Table(
+                                columnWidths: const {0: IntrinsicColumnWidth(), 1: FlexColumnWidth()},
+                                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                                children: [
+                                  _buildKeyValueRow('Principal remaining', '${_selectedCase!['principal_remaining'] ?? ''}'),
+                                  _buildKeyValueRow('Interest remaining', '${_selectedCase!['interest_remaining'] ?? ''}'),
+                                  _buildKeyValueRow('Penalty remaining', '${_selectedCase!['penalty_remaining'] ?? ''}'),
+                                  _buildKeyValueRow('Other remaining', '${_selectedCase!['others_remaining'] ?? ''}'),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+
+                            // Willing to pay amount (from DB)
+                            if ((_selectedCase!['principal_willing'] != null) || (_selectedCase!['interest_willing'] != null) || (_selectedCase!['interest_months'] != null) || (_selectedCase!['penalty_willing'] != null) || (_selectedCase!['others_willing'] != null)) ...[
+                              const SelectableText('Willing to pay amount', style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              Table(
+                                columnWidths: const {0: IntrinsicColumnWidth(), 1: FlexColumnWidth()},
+                                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                                children: [
+                                  _buildKeyValueRow('Principal (willing)', '${_selectedCase!['principal_willing'] ?? ''}'),
+                                  _buildKeyValueRow('Interest (willing)', '${_selectedCase!['interest_willing'] ?? ''}'),
+                                  _buildKeyValueRow('Interest months', '${_selectedCase!['interest_months'] ?? ''}'),
+                                  _buildKeyValueRow('Penalty (willing)', '${_selectedCase!['penalty_willing'] ?? ''}'),
+                                  _buildKeyValueRow('Other (willing)', '${_selectedCase!['others_willing'] ?? ''}'),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+
                             // Remark after payment history — render as larger readable block
                             if ((_selectedCase!['remark'] ?? '').toString().isNotEmpty) ...[
                               Padding(
