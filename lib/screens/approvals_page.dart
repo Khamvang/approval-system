@@ -4,6 +4,10 @@ import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter_pdfview/flutter_pdfview.dart';
 import '../services/session.dart';
 import 'close_contract_approval_page.dart';
 import '../services/close_contract_api.dart';
@@ -607,22 +611,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                                           IconButton(
                                             tooltip: 'Open',
                                             onPressed: () async {
-                                              final full = _normalizeAttachmentUrl(u);
-                                              final uri = Uri.tryParse(full);
-                                              if (uri == null) {
-                                                if (!mounted) return;
-                                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid URL')));
-                                                return;
-                                              }
-                                              try {
-                                                if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-                                                  if (!mounted) return;
-                                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open URL')));
-                                                }
-                                              } catch (e) {
-                                                if (!mounted) return;
-                                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error opening URL: $e')));
-                                              }
+                                              await _showAttachmentPreview(u);
                                             },
                                             icon: const Icon(Icons.open_in_new, size: 18),
                                           ),
@@ -1070,6 +1059,82 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       if (u != null && u.pathSegments.isNotEmpty) return u.pathSegments.last;
     } catch (_) {}
     return url;
+  }
+
+  Future<void> _showAttachmentPreview(String rawUrl) async {
+    final full = _normalizeAttachmentUrl(rawUrl);
+    final low = rawUrl.split('?').first.split('/').last.toLowerCase();
+    final ext = low.contains('.') ? low.split('.').last : '';
+
+    // Image preview
+    if (['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'].contains(ext)) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          child: InteractiveViewer(
+            child: Image.network(
+              full,
+              fit: BoxFit.contain,
+              errorBuilder: (c, e, s) => const Padding(padding: EdgeInsets.all(16), child: Text('Failed to load image')),
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    // PDF preview
+    if (ext == 'pdf') {
+      // On web, open externally
+      if (kIsWeb) {
+        final uri = Uri.tryParse(full);
+        if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+
+      try {
+        final resp = await http.get(Uri.parse(full));
+        if (resp.statusCode != 200) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to fetch PDF')));
+          return;
+        }
+        final bytes = resp.bodyBytes;
+        final dir = await getTemporaryDirectory();
+        final file = File('${dir.path}/attachment_${DateTime.now().millisecondsSinceEpoch}.pdf');
+        await file.writeAsBytes(bytes);
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => Dialog(
+            insetPadding: const EdgeInsets.all(12),
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.8,
+              height: MediaQuery.of(context).size.height * 0.8,
+              child: PDFView(filePath: file.path),
+            ),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading PDF: $e')));
+      }
+      return;
+    }
+
+    // fallback: open externally
+    final uri = Uri.tryParse(full);
+    if (uri != null) {
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open URL')));
+      }
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid URL')));
+    }
   }
 
   Future<void> _confirmAndPerform(String result) async {
