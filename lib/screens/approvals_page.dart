@@ -444,9 +444,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                         ],
                       ),
                       const SizedBox(height: 6),
+                      // show submitted timestamp only in header; person in charge and manager are shown in the Details table
                       Row(children: [
-                        SelectableText('Person In Charge: ${_selectedCase!['person_in_charge'] ?? ''}', style: const TextStyle(color: Colors.grey)),
-                        const SizedBox(width: 12),
                         SelectableText('Submitted: ${_formatDateTime(_selectedCase!['created_at'])}', style: const TextStyle(color: Colors.grey)),
                       ]),
                       const SizedBox(height: 8),
@@ -475,12 +474,13 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                               columnWidths: const {0: IntrinsicColumnWidth(), 1: FlexColumnWidth()},
                               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                               children: [
+                                _buildKeyValueRow('Collection type', '${_selectedCase!['collection_type'] ?? ''}'),
                                 _buildKeyValueRow('Contract No', '${_selectedCase!['contract_no'] ?? _selectedCase!['id'] ?? ''}'),
-                                _buildKeyValueRow('Collection Type', '${_selectedCase!['collection_type'] ?? ''}'),
-                                _buildKeyValueRow('Person In Charge', '${_selectedCase!['person_in_charge'] ?? ''}'),
+                                _buildKeyValueRow('Person in Charge', '${_selectedCase!['person_in_charge'] ?? ''}'),
                                 _buildKeyValueRow('Manager', '${_selectedCase!['manager_in_charge'] ?? ''}'),
-                                _buildKeyValueRow('Created By', '${_selectedCase!['created_by_name'] ?? ''}'),
-                                _buildKeyValueRow('Created At', '${_selectedCase!['created_at'] ?? ''}'),
+                                _buildKeyValueRow('Lasted contract information', '${_selectedCase!['last_contract_info'] ?? ''}'),
+                                if (_paidTermRatio(_selectedCase!).isNotEmpty) _buildKeyValueRow('Paid Term / Total Term', _paidTermRatio(_selectedCase!)),
+                                _buildKeyValueRow('Full paid date (or first due date if unpaid)', '${_selectedCase!['full_paid_date'] ?? ''}'),
                                 if ((_selectedCase!['remark'] ?? '').toString().isNotEmpty) _buildKeyValueRow('Remark', '${_selectedCase!['remark']}'),
                               ],
                             ),
@@ -808,6 +808,23 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     } catch (_) {
       return src.toString();
     }
+  }
+
+  String _paidTermDisplay(Map<String, dynamic> c) {
+    if (c.containsKey('paid_term') && (c['paid_term']?.toString().trim().isNotEmpty ?? false)) return c['paid_term'].toString();
+    if (c.containsKey('paid_term_total') && (c['paid_term_total']?.toString().trim().isNotEmpty ?? false)) return c['paid_term_total'].toString();
+    if (c.containsKey('paid_term_display') && (c['paid_term_display']?.toString().trim().isNotEmpty ?? false)) return c['paid_term_display'].toString();
+    return '';
+  }
+
+  String _paidTermRatio(Map<String, dynamic> c) {
+    final paid = (c['paid_term']?.toString().trim() ?? '');
+    // prefer explicit total_term, then fall back to paid_term_total if present
+    final total = (c['total_term']?.toString().trim() ?? c['paid_term_total']?.toString().trim() ?? '');
+    if (paid.isEmpty && total.isEmpty) return '';
+    if (paid.isEmpty) return '/ $total';
+    if (total.isEmpty) return paid;
+    return '$paid / $total';
   }
 
   Future<void> _confirmAndPerform(String result) async {
