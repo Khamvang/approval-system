@@ -18,7 +18,8 @@ const _steps = [
 
 class CloseContractApprovalPage extends StatefulWidget {
   final Map<String, dynamic>? user;
-  const CloseContractApprovalPage({super.key, this.user});
+  final Map<String, dynamic>? initialData;
+  const CloseContractApprovalPage({super.key, this.user, this.initialData});
 
   @override
   State<CloseContractApprovalPage> createState() => _CloseContractApprovalPageState();
@@ -66,6 +67,11 @@ class _CloseContractApprovalPageState extends State<CloseContractApprovalPage> {
     }
     _ctrl['collection_type']!.text = 'This month';
     _loadUserAndData();
+    // if initial data provided (resubmit), populate form
+    if (widget.initialData != null) {
+      _currentRequest = Map<String, dynamic>.from(widget.initialData!);
+      _populateFrom(_currentRequest!);
+    }
   }
 
   @override
@@ -99,6 +105,16 @@ class _CloseContractApprovalPageState extends State<CloseContractApprovalPage> {
     final result = await FilePicker.platform.pickFiles(withData: true);
     if (result != null && result.files.isNotEmpty) {
       setState(() => _attachment = result.files.first);
+    }
+  }
+
+  void _populateFrom(Map<String, dynamic> data) {
+    for (final key in _ctrl.keys) {
+      try {
+        if (data.containsKey(key) && data[key] != null) {
+          _ctrl[key]!.text = data[key].toString();
+        }
+      } catch (_) {}
     }
   }
 
@@ -139,10 +155,23 @@ class _CloseContractApprovalPageState extends State<CloseContractApprovalPage> {
     };
 
     try {
-      final item = await CloseContractApi.createRequest(payload: payload, attachment: _attachment);
-      setState(() => _currentRequest = item);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Submitted for Credit Approval')));
+      if (_currentRequest != null) {
+        // update existing request (resubmit)
+        int? reqId;
+        final id = _currentRequest!['id'];
+        if (id is int) reqId = id;
+        else if (id is String) reqId = int.tryParse(id);
+        if (reqId == null) throw Exception('Invalid request id for update');
+        final item = await CloseContractApi.updateRequest(reqId, payload: payload, attachment: _attachment);
+        setState(() => _currentRequest = item);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Resubmitted')));
+      } else {
+        final item = await CloseContractApi.createRequest(payload: payload, attachment: _attachment);
+        setState(() => _currentRequest = item);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Submitted for Credit Approval')));
+      }
       await _refreshTodo();
     } catch (e) {
       setState(() => _error = e.toString());

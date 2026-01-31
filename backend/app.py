@@ -114,6 +114,19 @@ def ensure_close_contract_tables():
             FOREIGN KEY (request_id) REFERENCES close_contract_forms(id)
         )
         ''')
+        # comments table for free-form user comments on a request
+        cur.execute('''
+        CREATE TABLE IF NOT EXISTS close_contract_comments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            request_id INT NOT NULL,
+            user_id INT,
+            user_email VARCHAR(255),
+            user_name VARCHAR(255),
+            text TEXT NOT NULL,
+            created_at VARCHAR(64),
+            FOREIGN KEY (request_id) REFERENCES close_contract_forms(id)
+        )
+        ''')
         conn.commit()
         cur.close()
         conn.close()
@@ -168,6 +181,19 @@ def ensure_close_contract_tables():
             actor_id INTEGER,
             actor_name TEXT,
             acted_at TEXT,
+            FOREIGN KEY (request_id) REFERENCES close_contract_forms(id)
+        )
+        ''')
+        # comments table for free-form user comments on a request
+        cur.execute('''
+        CREATE TABLE IF NOT EXISTS close_contract_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            request_id INTEGER NOT NULL,
+            user_id INTEGER,
+            user_email TEXT,
+            user_name TEXT,
+            text TEXT NOT NULL,
+            created_at TEXT,
             FOREIGN KEY (request_id) REFERENCES close_contract_forms(id)
         )
         ''')
@@ -585,6 +611,20 @@ def _fetch_actions_for_request(conn, request_id):
     return [dict(r) for r in rows]
 
 
+def _fetch_comments_for_request(conn, request_id):
+    if DB_TYPE.lower() == 'mysql':
+        cur = conn.cursor(dictionary=True)
+        cur.execute('SELECT id, request_id, user_id, user_email, user_name, text, created_at FROM close_contract_comments WHERE request_id = %s ORDER BY created_at ASC, id ASC', (request_id,))
+        rows = cur.fetchall()
+        cur.close()
+        return rows
+    cur = conn.cursor()
+    cur.execute('SELECT id, request_id, user_id, user_email, user_name, text, created_at FROM close_contract_comments WHERE request_id = ? ORDER BY created_at ASC, id ASC', (request_id,))
+    rows = cur.fetchall()
+    cur.close()
+    return [dict(r) for r in rows]
+
+
 def _load_request(conn, request_id):
     if DB_TYPE.lower() == 'mysql':
         cur = conn.cursor(dictionary=True)
@@ -802,8 +842,177 @@ def close_contract_detail(request_id):
         return jsonify({'error': 'Not found'}), 404
     row = close_contract_row_to_dict(row)
     row['actions'] = _fetch_actions_for_request(conn, request_id)
+    # include free-form comments
+    try:
+        row['comments'] = _fetch_comments_for_request(conn, request_id)
+    except Exception:
+        row['comments'] = []
     conn.close()
     return jsonify({'item': row})
+
+
+@app.route('/api/close-contracts/<int:request_id>', methods=['PATCH'])
+def close_contract_update(request_id):
+    # allow updating an existing request (used for resubmit/edit)
+    conn = get_mysql_conn() if DB_TYPE.lower() == 'mysql' else get_sqlite_conn()
+    row = _load_request(conn, request_id)
+    if not row:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+
+    try:
+        payload = request.get_json(silent=True) or {}
+    except Exception:
+        payload = {}
+    is_multipart = request.content_type and 'multipart/form-data' in request.content_type
+    if is_multipart:
+        payload = request.form.to_dict()
+
+    def _to_int(v):
+        try:
+            return int(v) if v not in (None, '') else None
+        except Exception:
+            return None
+
+    def _to_float(v):
+        try:
+            return float(v) if v not in (None, '') else None
+        except Exception:
+            return None
+
+    attachment_url = None
+    if is_multipart and 'attachment' in request.files:
+        attachment_url = _save_attachment_if_any(request.files['attachment'])
+    else:
+        # allow clearing or keeping existing
+        if 'attachment_url' in payload:
+            attachment_url = payload.get('attachment_url')
+
+    updates = []
+    params = []
+    fields = [
+        'collection_type','contract_no','person_in_charge','manager_in_charge','last_contract_info',
+        'paid_term','total_term','full_paid_date','s_count','a_count','b_count','c_count','f_count',
+        'principal_remaining','interest_remaining','penalty_remaining','others_remaining',
+        'principal_willing','interest_willing','interest_months','penalty_willing','others_willing','remark'
+    ]
+    for f in fields:
+        if f in payload:
+            updates.append(f + (' = %s' if DB_TYPE.lower() == 'mysql' else ' = ?'))
+            val = payload.get(f)
+            if f in ('paid_term','total_term','s_count','a_count','b_count','c_count','f_count','interest_months'):
+                params.append(_to_int(val))
+            elif f in ('principal_remaining','interest_remaining','penalty_remaining','others_remaining','principal_willing','interest_willing','penalty_willing','others_willing'):
+                params.append(_to_float(val))
+            else:
+                params.append(val)
+
+    # attachment_url update handling
+    if attachment_url is not None:
+        updates.append('attachment_url' + (' = %s' if DB_TYPE.lower() == 'mysql' else ' = ?'))
+        params.append(attachment_url)
+
+    # always update updated_at
+    updates.append('updated_at' + (' = %s' if DB_TYPE.lower() == 'mysql' else ' = ?'))
+    params.append(now_iso())
+
+    # when resubmitting, reset status/current_step to restart approval flow
+    updates.append('status' + (' = %s' if DB_TYPE.lower() == 'mysql' else ' = ?'))
+    params.append('under_review')
+    updates.append('current_step' + (' = %s' if DB_TYPE.lower() == 'mysql' else ' = ?'))
+    params.append('credit')
+
+    if not updates:
+        conn.close()
+        return jsonify({'error': 'Nothing to update'}), 400
+
+    try:
+        if DB_TYPE.lower() == 'mysql':
+            q = ', '.join([u.replace(' = %s', ' = %s') for u in updates])
+            cur = conn.cursor()
+            cur.execute(f'UPDATE close_contract_forms SET {q} WHERE id = %s', (*params, request_id))
+            conn.commit()
+            # add resubmit action record
+            acted_at = now_iso()
+            cur.execute('INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', (request_id, 'submit', 'Submit', 'Submitter', 'resubmitted', payload.get('remark') or '', payload.get('created_by_email'), _to_int(payload.get('created_by_id')), payload.get('created_by_name'), acted_at))
+            conn.commit()
+            updated = _load_request(conn, request_id)
+            updated = close_contract_row_to_dict(updated)
+            updated['actions'] = _fetch_actions_for_request(conn, request_id)
+            cur.close()
+            conn.close()
+            return jsonify({'ok': True, 'item': updated})
+        else:
+            q = ', '.join(updates)
+            cur = conn.cursor()
+            cur.execute(f'UPDATE close_contract_forms SET {q} WHERE id = ?', (*params, request_id))
+            conn.commit()
+            acted_at = now_iso()
+            cur.execute('INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (request_id, 'submit', 'Submit', 'Submitter', 'resubmitted', payload.get('remark') or '', payload.get('created_by_email'), _to_int(payload.get('created_by_id')), payload.get('created_by_name'), acted_at))
+            conn.commit()
+            updated = _load_request(conn, request_id)
+            updated = close_contract_row_to_dict(updated)
+            updated['actions'] = _fetch_actions_for_request(conn, request_id)
+            cur.close()
+            conn.close()
+            return jsonify({'ok': True, 'item': updated})
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        conn.close()
+        logging.exception('Failed to update close_contract: %s', e)
+        return jsonify({'error': 'Update failed', 'detail': str(e)}), 500
+
+
+@app.route('/api/close-contracts/<int:request_id>/comments', methods=['GET', 'POST'])
+def close_contract_comments(request_id):
+    conn = get_mysql_conn() if DB_TYPE.lower() == 'mysql' else get_sqlite_conn()
+    # ensure request exists
+    req = _load_request(conn, request_id)
+    if not req:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+
+    if request.method == 'GET':
+        comments = _fetch_comments_for_request(conn, request_id)
+        conn.close()
+        return jsonify({'comments': comments})
+
+    # POST -> create a comment
+    data = request.get_json() or {}
+    text = (data.get('text') or '').strip()
+    if not text:
+        conn.close()
+        return jsonify({'error': 'text is required'}), 400
+    user_email = data.get('user_email')
+    user_id = data.get('user_id')
+    user_name = data.get('user_name')
+    created_at = now_iso()
+
+    if DB_TYPE.lower() == 'mysql':
+        cur = conn.cursor()
+        cur.execute('INSERT INTO close_contract_comments (request_id, user_id, user_email, user_name, text, created_at) VALUES (%s, %s, %s, %s, %s, %s)', (request_id, user_id, user_email, user_name, text, created_at))
+        conn.commit()
+        comment_id = cur.lastrowid
+        cur.close()
+        # fetch inserted
+        cur = conn.cursor(dictionary=True)
+        cur.execute('SELECT id, request_id, user_id, user_email, user_name, text, created_at FROM close_contract_comments WHERE id = %s', (comment_id,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        return jsonify({'ok': True, 'comment': row}), 201
+    else:
+        cur = conn.cursor()
+        cur.execute('INSERT INTO close_contract_comments (request_id, user_id, user_email, user_name, text, created_at) VALUES (?, ?, ?, ?, ?, ?)', (request_id, user_id, user_email, user_name, text, created_at))
+        conn.commit()
+        comment_id = cur.lastrowid
+        cur.close()
+        cur = conn.cursor()
+        cur.execute('SELECT id, request_id, user_id, user_email, user_name, text, created_at FROM close_contract_comments WHERE id = ?', (comment_id,))
+        r = cur.fetchone()
+        conn.close()
+        return jsonify({'ok': True, 'comment': dict(r) if r else None}), 201
 
 
 @app.route('/api/close-contracts/<int:request_id>/action', methods=['POST'])

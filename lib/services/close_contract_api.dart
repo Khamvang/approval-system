@@ -37,6 +37,31 @@ class CloseContractApi {
     return (data['item'] as Map<String, dynamic>?) ?? {};
   }
 
+  static Future<List<Map<String, dynamic>>> listComments(int requestId) async {
+    final resp = await http.get(_uri('/api/close-contracts/$requestId/comments'));
+    if (resp.statusCode != 200) {
+      throw Exception('Failed to load comments: ${resp.body}');
+    }
+    final data = json.decode(resp.body) as Map<String, dynamic>;
+    final items = (data['comments'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+    return items;
+  }
+
+  static Future<Map<String, dynamic>> createComment(int requestId, {required String text, String? userEmail, int? userId, String? userName}) async {
+    final body = {
+      'text': text,
+      if (userEmail != null) 'user_email': userEmail,
+      if (userId != null) 'user_id': userId,
+      if (userName != null) 'user_name': userName,
+    };
+    final resp = await http.post(_uri('/api/close-contracts/$requestId/comments'), headers: {'Content-Type': 'application/json'}, body: json.encode(body));
+    if (resp.statusCode != 201) {
+      throw Exception('Create comment failed: ${resp.body}');
+    }
+    final data = json.decode(resp.body) as Map<String, dynamic>;
+    return (data['comment'] as Map<String, dynamic>?) ?? {};
+  }
+
   static Future<Map<String, dynamic>> createRequest({required Map<String, dynamic> payload, PlatformFile? attachment}) async {
     http.BaseRequest request;
     if (attachment != null) {
@@ -58,6 +83,33 @@ class CloseContractApi {
     final resp = await http.Response.fromStream(streamed);
     if (resp.statusCode != 201) {
       throw Exception('Create failed: ${resp.body}');
+    }
+    final data = json.decode(resp.body) as Map<String, dynamic>;
+    return (data['item'] as Map<String, dynamic>?) ?? {};
+  }
+
+  static Future<Map<String, dynamic>> updateRequest(int id, {required Map<String, dynamic> payload, PlatformFile? attachment}) async {
+    http.BaseRequest request;
+    final uri = _uri('/api/close-contracts/$id');
+    if (attachment != null) {
+      final req = http.MultipartRequest('PATCH', uri);
+      req.fields.addAll(payload.map((key, value) => MapEntry(key, value?.toString() ?? '')));
+      if (attachment.bytes != null) {
+        req.files.add(http.MultipartFile.fromBytes('attachment', attachment.bytes!, filename: attachment.name));
+      } else if (attachment.path != null) {
+        req.files.add(await http.MultipartFile.fromPath('attachment', attachment.path!, filename: attachment.name));
+      }
+      request = req;
+    } else {
+      request = http.Request('PATCH', uri)
+        ..headers['Content-Type'] = 'application/json'
+        ..body = json.encode(payload);
+    }
+
+    final streamed = await request.send();
+    final resp = await http.Response.fromStream(streamed);
+    if (resp.statusCode != 200) {
+      throw Exception('Update failed: ${resp.body}');
     }
     final data = json.decode(resp.body) as Map<String, dynamic>;
     return (data['item'] as Map<String, dynamic>?) ?? {};

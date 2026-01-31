@@ -96,6 +96,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   Map<String, dynamic>? _selectedCase;
   bool _loadingCase = false;
   bool _acting = false;
+  final TextEditingController _commentController = TextEditingController();
+  bool _postingComment = false;
   // resizable panels with default widths: left 250px, middle 350px; right auto-fills remainder ..
   double _leftPanelWidth = 250;
   double _middlePanelWidth = 350;
@@ -119,7 +121,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
           m['title'] = m['contract_no'] ?? m['title'] ?? '';
           m['subtitle'] = m['person_in_charge'] ?? m['created_by_name'] ?? '';
           m['status'] = m['status'] ?? '';
-          m['time'] = m['created_at'] ?? '';
+          // prefer the last update datetime for listing and relative time calculations
+          m['time'] = m['updated_at'] ?? m['created_at'] ?? '';
           return m;
         }).toList();
       });
@@ -141,6 +144,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _commentController.dispose();
     super.dispose();
   }
 
@@ -385,10 +389,20 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                         setState(() { _loadingCase = true; _selectedCase = null; });
                         try {
                           final detailed = await CloseContractApi.getRequest(reqId);
+                          // fetch comments separately to keep payload small
+                          List<Map<String, dynamic>> comments = [];
+                          try {
+                            final cm = await CloseContractApi.listComments(reqId);
+                            comments = cm;
+                          } catch (_) {
+                            comments = [];
+                          }
                           if (!mounted) {
                             return;
                           }
-                          setState(() { _selectedCase = Map<String, dynamic>.from(detailed); });
+                          final map = Map<String, dynamic>.from(detailed);
+                          map['comments'] = comments;
+                          setState(() { _selectedCase = map; });
                         } catch (e) {
                           // fallback to shallow case
                           if (!mounted) {
@@ -410,7 +424,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                           Container(width: 44, height: 44, decoration: BoxDecoration(color: Colors.pink.shade400, borderRadius: BorderRadius.circular(6)), child: const Icon(Icons.person, color: Colors.white)),
                           const SizedBox(width: 12),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [SelectableText(c['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)), const SizedBox(height: 4), SelectableText(c['subtitle'] ?? '', style: const TextStyle(color: Colors.grey))])),
-                          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(c['status'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_relativeTime(c['created_at'] ?? c['time']), style: const TextStyle(color: Colors.grey, fontSize: 12))]),
+                          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text(c['status'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 6), Text(_relativeTime(c['updated_at'] ?? c['created_at'] ?? c['time']), style: const TextStyle(color: Colors.grey, fontSize: 12))]),
                         ],
                       ),
                     ),
@@ -468,6 +482,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                       Row(children: [
                         SelectableText('Submitted: ${_formatDateTime(_selectedCase!['created_at'])}', style: const TextStyle(color: Colors.grey)),
                       ]),
+                      if ((_selectedCase!['updated_at'] ?? '').toString().isNotEmpty && (_selectedCase!['updated_at']?.toString() != _selectedCase!['created_at']?.toString()))
+                        Row(children: [SelectableText('Updated: ${_formatDateTime(_selectedCase!['updated_at'])}', style: const TextStyle(color: Colors.grey))]),
                       const SizedBox(height: 8),
                       TabBar(
                         tabs: const [Tab(text: 'Details'), Tab(text: 'Approval Record'), Tab(text: 'Comments')],
@@ -654,6 +670,13 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             const SizedBox(height: 4),
+                            // input area
+                            Row(children: [
+                              Expanded(child: TextField(controller: _commentController, maxLines: 3, decoration: const InputDecoration(hintText: 'Add a comment', border: UnderlineInputBorder()))),
+                              const SizedBox(width: 8),
+                              ElevatedButton(onPressed: _postingComment ? null : _postComment, style: ElevatedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18))), child: _postingComment ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Send')),
+                            ]),
+                            const SizedBox(height: 12),
                             if (((_selectedCase!['comments'] ?? []) as List).isEmpty)
                               const Text('No comments', style: TextStyle(color: Colors.grey))
                             else
@@ -661,9 +684,22 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                                 Card(
                                   margin: const EdgeInsets.symmetric(vertical: 6),
                                   child: ListTile(
-                                    title: Text(c is Map ? (c['author'] ?? c['by'] ?? '').toString() : ''),
-                                    subtitle: Text(c is Map ? (c['text'] ?? c['comment'] ?? c.toString()).toString() : c.toString()),
-                                    trailing: Text(c is Map ? (c['at'] ?? c['created_at'] ?? '').toString() : ''),
+                                    title: Text(c is Map ? (c['user_name'] ?? c['user_email'] ?? '').toString() : ''),
+                                    subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(c is Map ? (c['text'] ?? c['comment'] ?? c.toString()).toString() : c.toString())]),
+                                    trailing: Builder(builder: (ctx) {
+                                      final created = c is Map ? (c['created_at'] ?? c['at'] ?? null) : null;
+                                      final abs = _formatDateTime(created);
+                                      final rel = _relativeTime(created);
+                                      return Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Text(abs, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                                          const SizedBox(height: 4),
+                                          Text(rel, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                                        ],
+                                      );
+                                    }),
                                   ),
                                 ),
                           ],
@@ -681,11 +717,25 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                   color: Colors.white,
                   child: Row(
                     children: [
-                      Expanded(child: ElevatedButton(onPressed: _acting ? null : () => _confirmAndPerform('approve'), child: _acting ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Approve'))),
+                      Expanded(child: OutlinedButton(onPressed: _acting ? null : _openResubmit, child: const Text('Resubmit'))),
                       const SizedBox(width: 8),
-                      Expanded(child: ElevatedButton(onPressed: _acting ? null : () => _confirmAndPerform('send_back'), style: ElevatedButton.styleFrom(backgroundColor: Colors.orange), child: _acting ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Send Back'))),
+                      Builder(builder: (ctx) {
+                        final status = (_selectedCase?['status'] ?? '').toString().toLowerCase();
+                        final finalized = (status == 'approved' || status == 'rejected');
+                        return Expanded(child: ElevatedButton(onPressed: (_acting || finalized) ? null : () => _confirmAndPerform('approve'), child: _acting ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Approve')));
+                      }),
                       const SizedBox(width: 8),
-                      Expanded(child: ElevatedButton(onPressed: _acting ? null : () => _confirmAndPerform('reject'), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: _acting ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Reject'))),
+                      Builder(builder: (ctx) {
+                        final status = (_selectedCase?['status'] ?? '').toString().toLowerCase();
+                        final finalized = (status == 'approved' || status == 'rejected');
+                        return Expanded(child: ElevatedButton(onPressed: (_acting || finalized) ? null : () => _confirmAndPerform('send_back'), style: ElevatedButton.styleFrom(backgroundColor: Colors.orange), child: _acting ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Send Back')));
+                      }),
+                      const SizedBox(width: 8),
+                      Builder(builder: (ctx) {
+                        final status = (_selectedCase?['status'] ?? '').toString().toLowerCase();
+                        final finalized = (status == 'approved' || status == 'rejected');
+                        return Expanded(child: ElevatedButton(onPressed: (_acting || finalized) ? null : () => _confirmAndPerform('reject'), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: _acting ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Reject')));
+                      }),
                     ],
                   ),
                 ),
@@ -1342,6 +1392,63 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Action failed: $e')));
     } finally {
       if (mounted) setState(() { _acting = false; });
+    }
+  }
+
+  void _openResubmit() async {
+    if (_selectedCase == null) return;
+    int? reqId;
+    final id = _selectedCase!['id'];
+    if (id is int) reqId = id; else if (id is String) reqId = int.tryParse(id);
+    if (reqId == null) return;
+    await Navigator.of(context).push(MaterialPageRoute(builder: (ctx) => CloseContractApprovalPage(initialData: _selectedCase)));
+    // after return, refresh the detailed case from backend to get updated actions
+    try {
+      final detailed = await CloseContractApi.getRequest(reqId);
+      if (!mounted) return;
+      final map = Map<String, dynamic>.from(detailed);
+      // fetch comments too
+      List<Map<String, dynamic>> comments = [];
+      try { comments = await CloseContractApi.listComments(reqId); } catch (_) { comments = []; }
+      map['comments'] = comments;
+      setState(() { _selectedCase = map; });
+      // refresh center list
+      if (_selectedCenterApp == 'Close Contract Approval Ringi') await _loadCloseContractCases();
+    } catch (e) {
+      // ignore refresh errors
+    }
+  }
+
+  Future<void> _postComment() async {
+    if (_selectedCase == null) return;
+    final id = _selectedCase!['id'];
+    int? reqId;
+    if (id is int) reqId = id;
+    else if (id is String) reqId = int.tryParse(id);
+    if (reqId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid request id')));
+      return;
+    }
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+    setState(() { _postingComment = true; });
+    try {
+      final user = await Session.loadUser();
+      final created = await CloseContractApi.createComment(reqId, text: text, userEmail: user?['email'], userId: user?['id'] is int ? user!['id'] as int : (user?['id'] is String ? int.tryParse(user!['id'].toString()) : null), userName: user == null ? null : ('${user['first_name'] ?? ''} ${user['last_name'] ?? ''}').trim());
+      // append to local comments list
+      final cur = List<Map<String, dynamic>>.from((_selectedCase!['comments'] ?? []) as List);
+      cur.add(created);
+      setState(() {
+        _selectedCase!['comments'] = cur;
+        _commentController.clear();
+      });
+      // refresh list view in center
+      if (_selectedCenterApp == 'Close Contract Approval Ringi') await _loadCloseContractCases();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to post comment: $e')));
+    } finally {
+      if (mounted) setState(() { _postingComment = false; });
     }
   }
 
