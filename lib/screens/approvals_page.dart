@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/session.dart';
 import 'close_contract_approval_page.dart';
+import '../services/close_contract_api.dart';
 
 class ApprovalsPage extends StatefulWidget {
   const ApprovalsPage({Key? key}) : super(key: key);
@@ -78,9 +79,13 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     }),
   };
 
+  // cache for cases loaded from backend keyed by app title
+  final Map<String, List<Map<String, dynamic>>> _loadedCases = {};
+
   String _selectedCenterSection = 'To-do';
   String _selectedCenterApp = 'System Modification Ringi';
-  Map<String, String>? _selectedCase;
+  Map<String, dynamic>? _selectedCase;
+  bool _loadingCase = false;
   // resizable panels with default widths: left 250px, middle 350px; right auto-fills remainder ..
   double _leftPanelWidth = 250;
   double _middlePanelWidth = 350;
@@ -89,6 +94,26 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   void initState() {
     super.initState();
     _loadPrefs();
+  }
+
+  Future<void> _loadCloseContractCases() async {
+    try {
+      final items = await CloseContractApi.listRequests(includeActions: true);
+      if (!mounted) return;
+      setState(() {
+        // store items as-case list; normalize some display fields
+        _loadedCases['Close Contract Approval Ringi'] = items.map((it) {
+          final m = Map<String, dynamic>.from(it);
+          m['title'] = m['contract_no'] ?? m['title'] ?? '';
+          m['subtitle'] = m['person_in_charge'] ?? m['created_by_name'] ?? '';
+          m['status'] = m['status'] ?? '';
+          m['time'] = m['created_at'] ?? '';
+          return m;
+        }).toList();
+      });
+    } catch (e) {
+      // ignore load errors for now; keep sample data
+    }
   }
 
   Future<void> _loadPrefs() async {
@@ -225,7 +250,20 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       _selectedCase = null;
     }
 
-    final cases = _sampleCases[_selectedCenterApp] ?? [];
+    // prefer backend-loaded cases for Close Contract app if available
+    List<Map<String, dynamic>> cases = [];
+    if (_selectedCenterApp == 'Close Contract Approval Ringi') {
+      if (_loadedCases.containsKey(_selectedCenterApp)) {
+        cases = _loadedCases[_selectedCenterApp]!;
+      } else {
+        // fallback to sample data shaped as dynamic maps
+        cases = (_sampleCases[_selectedCenterApp] ?? []).map((m) => m.map((k, v) => MapEntry(k, v))).toList();
+        // trigger async load
+        _loadCloseContractCases();
+      }
+    } else {
+      cases = (_sampleCases[_selectedCenterApp] ?? []).map((m) => m.map((k, v) => MapEntry(k, v))).toList();
+    }
 
     return LayoutBuilder(builder: (context, constraints) {
       final total = constraints.maxWidth;
@@ -238,7 +276,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       _leftPanelWidth = _leftPanelWidth.clamp(minLeft, total - _middlePanelWidth - minRight - gutter);
       _middlePanelWidth = _middlePanelWidth.clamp(minMiddle, total - _leftPanelWidth - minRight - gutter);
 
-      final rightWidth = (total - _leftPanelWidth - _middlePanelWidth - gutter).clamp(minRight, double.infinity);
+      // rightWidth is no longer used (right panel is Expanded)
 
       // Left panel
       final leftPanel = Container(
@@ -262,11 +300,14 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         InkWell(
-                          onTap: () => setState(() {
-                            _selectedCenterSection = section;
-                            _selectedCenterApp = apps.isNotEmpty ? apps.first : '';
-                            _selectedCase = null;
-                          }),
+                          onTap: () async {
+                            setState(() {
+                              _selectedCenterSection = section;
+                              _selectedCenterApp = apps.isNotEmpty ? apps.first : '';
+                              _selectedCase = null;
+                            });
+                            if (_selectedCenterApp == 'Close Contract Approval Ringi') await _loadCloseContractCases();
+                          },
                             child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
                             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [SelectableText(section, style: TextStyle(fontWeight: FontWeight.bold, color: expanded ? Colors.indigo : Colors.black87)), Text('${apps.length}')]),
@@ -279,10 +320,13 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                                 return ListTile(
                                 dense: true,
                                 title: SelectableText(a, style: TextStyle(color: sel ? Colors.indigo : Colors.black87)),
-                                onTap: () => setState(() {
-                                  _selectedCenterApp = a;
-                                  _selectedCase = null;
-                                }),
+                                onTap: () async {
+                                  setState(() {
+                                    _selectedCenterApp = a;
+                                    _selectedCase = null;
+                                  });
+                                  if (a == 'Close Contract Approval Ringi') await _loadCloseContractCases();
+                                },
                                 selected: sel,
                                 selectedTileColor: Colors.indigo.withAlpha(30),
                               );
@@ -302,7 +346,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       final middlePanel = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(padding: const EdgeInsets.all(12), color: Colors.white, child: Row(children: [SelectableText(_selectedCenterApp, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), const Spacer(), DropdownButton<String>(value: 'All Time', items: const [DropdownMenuItem(value: 'All Time', child: Text('All Time'))], onChanged: (_) {})])),
+          Container(padding: const EdgeInsets.all(12), color: Colors.white, child: Row(children: [SelectableText(_selectedCenterApp, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), const Spacer(), DropdownButton<String>(value: 'All Time', items: const [DropdownMenuItem(value: 'All Time', child: Text('All Time'))], onChanged: (_) {}), const SizedBox(width: 8), IconButton(icon: const Icon(Icons.refresh), tooltip: 'Refresh', onPressed: _selectedCenterApp == 'Close Contract Approval Ringi' ? () => _loadCloseContractCases() : null)])),
           Expanded(
             child: Container(
               color: const Color(0xFFF6F7FB),
@@ -314,7 +358,29 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                   final c = cases[i];
                   final selected = _selectedCase != null && _selectedCase!['id'] == c['id'];
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedCase = c),
+                    onTap: () async {
+                      // if item has numeric id, fetch full details from backend
+                      final id = c['id'];
+                      int? reqId;
+                      if (id is int) reqId = id;
+                      else if (id is String) reqId = int.tryParse(id);
+                      if (reqId != null) {
+                        setState(() { _loadingCase = true; _selectedCase = null; });
+                        try {
+                          final detailed = await CloseContractApi.getRequest(reqId);
+                          if (!mounted) return;
+                          setState(() { _selectedCase = Map<String, dynamic>.from(detailed); });
+                        } catch (e) {
+                          // fallback to shallow case
+                          if (!mounted) return;
+                          setState(() { _selectedCase = Map<String, dynamic>.from(c); });
+                        } finally {
+                          if (mounted) setState(() { _loadingCase = false; });
+                        }
+                      } else {
+                        setState(() => _selectedCase = Map<String, dynamic>.from(c));
+                      }
+                    },
                           child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(color: selected ? Colors.white : Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: selected ? Colors.indigo : Colors.grey.shade300)),
@@ -335,75 +401,182 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
         ],
       );
 
-      // Right panel
-      final rightPanel = Container(
-        color: Colors.white,
-        child: _selectedCase == null
-            ? Center(child: Padding(padding: const EdgeInsets.all(24.0), child: Column(mainAxisSize: MainAxisSize.min, children: [SelectableText('Select a case to view details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8), SelectableText('Case details will appear here.')])) )
-            : Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  SelectableText(_selectedCase!['title'] ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Row(children: [Container(width: 36, height: 36, decoration: BoxDecoration(color: Colors.pink.shade400, borderRadius: BorderRadius.circular(6)), child: const Icon(Icons.person, color: Colors.white)), const SizedBox(width: 8), SelectableText(_selectedCase!['subtitle'] ?? '')]),
-                  const SizedBox(height: 12),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  SelectableText('Details', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  SelectableText('ID: ${'' /* placeholder for id */}${_selectedCase!['id'] ?? ''}'),
-                  const SizedBox(height: 8),
-                  SelectableText('Status: ${_selectedCase!['status'] ?? ''}'),
-                  const SizedBox(height: 12),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                    ElevatedButton.icon(onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Approve clicked')));
-                    }, icon: const Icon(Icons.check), label: const Text('Approve')),
+      // Right panel: scrollable detailed view for selected case
+      Widget rightPanel;
+      if (_loadingCase) {
+        rightPanel = Container(color: Colors.white, child: const Center(child: Padding(padding: EdgeInsets.all(24.0), child: CircularProgressIndicator())));
+      } else if (_selectedCase == null) {
+        rightPanel = Container(
+          color: Colors.white,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [SelectableText('Select a case to view details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8), SelectableText('Case details will appear here.')]),
+            ),
+          ),
+        );
+      } else {
+        // Right panel with internal TabBar (Details / Approval Record / Comments)
+        rightPanel = Container(
+          color: Colors.white,
+          child: DefaultTabController(
+            length: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 12),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(child: SelectableText(_selectedCenterApp, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+                          if ((_selectedCase!['status'] ?? '').toString().isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(color: Colors.indigo.withAlpha(30), borderRadius: BorderRadius.circular(12)),
+                              child: Text((_selectedCase!['status'] ?? '').toString(), style: const TextStyle(color: Colors.indigo, fontWeight: FontWeight.w600)),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(children: [
+                        SelectableText('Person In Charge: ${_selectedCase!['person_in_charge'] ?? ''}', style: const TextStyle(color: Colors.grey)),
+                        const SizedBox(width: 12),
+                        SelectableText('Submitted: ${_formatDateTime(_selectedCase!['created_at'])}', style: const TextStyle(color: Colors.grey)),
+                      ]),
+                      const SizedBox(height: 8),
+                      TabBar(
+                        tabs: const [Tab(text: 'Details'), Tab(text: 'Approval Record'), Tab(text: 'Comments')],
+                        labelColor: Colors.indigo,
+                        unselectedLabelColor: Colors.black54,
+                        indicatorColor: Colors.indigo,
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                // Tab content
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      // Details tab: two-column key/value table + payment history DataTable
+                      SingleChildScrollView(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const SizedBox(height: 4),
+                            Table(
+                              columnWidths: const {0: IntrinsicColumnWidth(), 1: FlexColumnWidth()},
+                              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                              children: [
+                                _buildKeyValueRow('Contract No', '${_selectedCase!['contract_no'] ?? _selectedCase!['id'] ?? ''}'),
+                                _buildKeyValueRow('Collection Type', '${_selectedCase!['collection_type'] ?? ''}'),
+                                _buildKeyValueRow('Person In Charge', '${_selectedCase!['person_in_charge'] ?? ''}'),
+                                _buildKeyValueRow('Manager', '${_selectedCase!['manager_in_charge'] ?? ''}'),
+                                _buildKeyValueRow('Created By', '${_selectedCase!['created_by_name'] ?? ''}'),
+                                _buildKeyValueRow('Created At', '${_selectedCase!['created_at'] ?? ''}'),
+                                if ((_selectedCase!['remark'] ?? '').toString().isNotEmpty) _buildKeyValueRow('Remark', '${_selectedCase!['remark']}'),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            if (((_selectedCase!['payment_history'] ?? []) as List).isNotEmpty) ...[
+                              const Text('Payment History', style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: DataTable(
+                                  columns: const [
+                                    DataColumn(label: Text('Date')),
+                                    DataColumn(label: Text('Amount')),
+                                    DataColumn(label: Text('Note')),
+                                  ],
+                                  rows: (_selectedCase!['payment_history'] as List).map((ph) {
+                                    final date = (ph is Map && (ph['date'] ?? ph['created_at']) != null) ? (ph['date'] ?? ph['created_at']).toString() : ph.toString();
+                                    final amount = (ph is Map && (ph['amount'] ?? ph['amount_paid']) != null) ? (ph['amount'] ?? ph['amount_paid']).toString() : '';
+                                    final note = (ph is Map && (ph['note'] ?? ph['description']) != null) ? (ph['note'] ?? ph['description']).toString() : ph.toString();
+                                    return DataRow(cells: [DataCell(Text(date)), DataCell(Text(amount)), DataCell(Text(note))]);
+                                  }).toList(),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                          ],
+                        ),
+                      ),
 
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reject clicked')));
-                      },
-                      icon: const Icon(Icons.close, color: Colors.red),
-                      label: const Text('Reject', style: TextStyle(color: Colors.red)),
-                      style: OutlinedButton.styleFrom(side: BorderSide(color: Colors.red.shade200)),
-                    ),
+                      // Approval Record tab
+                      SingleChildScrollView(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const SizedBox(height: 4),
+                            if (((_selectedCase!['actions'] ?? _selectedCase!['approval_records']) ?? []).isEmpty)
+                              const Text('No approval records available', style: TextStyle(color: Colors.grey))
+                            else
+                              for (final a in ((_selectedCase!['actions'] ?? _selectedCase!['approval_records']) as List))
+                                ListTile(
+                                  dense: true,
+                                  title: Text(a is Map ? (a['action'] ?? a['type'] ?? a.toString()).toString() : a.toString()),
+                                  subtitle: Text(a is Map ? (a['by'] ?? a['actor'] ?? '').toString() : ''),
+                                  trailing: Text(a is Map ? (a['at'] ?? a['timestamp'] ?? '').toString() : ''),
+                                ),
+                          ],
+                        ),
+                      ),
 
-                    TextButton.icon(
-                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Group Chat'))),
-                      icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                      label: const Text('Group Chat'),
-                    ),
+                      // Comments tab
+                      SingleChildScrollView(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const SizedBox(height: 4),
+                            if (((_selectedCase!['comments'] ?? []) as List).isEmpty)
+                              const Text('No comments', style: TextStyle(color: Colors.grey))
+                            else
+                              for (final c in (_selectedCase!['comments'] as List))
+                                Card(
+                                  margin: const EdgeInsets.symmetric(vertical: 6),
+                                  child: ListTile(
+                                    title: Text(c is Map ? (c['author'] ?? c['by'] ?? '').toString() : ''),
+                                    subtitle: Text(c is Map ? (c['text'] ?? c['comment'] ?? c.toString()).toString() : c.toString()),
+                                    trailing: Text(c is Map ? (c['at'] ?? c['created_at'] ?? '').toString() : ''),
+                                  ),
+                                ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
-                    TextButton.icon(
-                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('CC'))),
-                      icon: const Icon(Icons.alternate_email, size: 18),
-                      label: const Text('CC'),
-                    ),
-
-                    TextButton.icon(
-                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Transfer'))),
-                      icon: const Icon(Icons.swap_horiz, size: 18),
-                      label: const Text('Transfer'),
-                    ),
-
-                    TextButton.icon(
-                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add Approver'))),
-                      icon: const Icon(Icons.person_add_alt_1, size: 18),
-                      label: const Text('Add Approver'),
-                    ),
-
-                    TextButton.icon(
-                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Send Back'))),
-                      icon: const Icon(Icons.reply, size: 18),
-                      label: const Text('Send Back'),
-                    ),
-                  ]),
-                ]),
-              ),
-      );
+                // Fixed bottom action bar
+                const Divider(height: 1),
+                Container(
+                  height: 64,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: Colors.white,
+                  child: Row(
+                    children: [
+                      Expanded(child: ElevatedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Approve (not wired)'))), child: const Text('Approve'))),
+                      const SizedBox(width: 8),
+                      Expanded(child: ElevatedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Send Back (not wired)'))), style: ElevatedButton.styleFrom(backgroundColor: Colors.orange), child: const Text('Send Back'))),
+                      const SizedBox(width: 8),
+                      Expanded(child: ElevatedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reject (not wired)'))), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Reject'))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
 
       return Row(
         children: [
@@ -429,7 +602,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
               child: Container(width: 8, color: Colors.transparent, child: Center(child: Container(width: 2, height: double.infinity, color: Colors.grey.shade300))),
             ),
           ),
-          SizedBox(width: rightWidth, child: rightPanel),
+          Expanded(child: rightPanel),
         ],
       );
     });
@@ -605,6 +778,35 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       decoration: BoxDecoration(color: Colors.pink.shade400, borderRadius: BorderRadius.circular(6)),
       child: const Icon(Icons.person, color: Colors.white, size: 22),
     );
+  }
+
+  TableRow _buildKeyValueRow(String key, String value) {
+    return TableRow(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: SelectableText(key, style: const TextStyle(color: Colors.grey)),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: SelectableText(value),
+        ),
+      ],
+    );
+  }
+
+  String _formatDateTime(dynamic src) {
+    if (src == null) return '';
+    try {
+      DateTime dt;
+      if (src is DateTime) dt = src;
+      else dt = DateTime.tryParse(src.toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final l = dt.toLocal();
+      String two(int n) => n.toString().padLeft(2, '0');
+      return '${l.year}-${two(l.month)}-${two(l.day)} ${two(l.hour)}:${two(l.minute)}:${two(l.second)}';
+    } catch (_) {
+      return src.toString();
+    }
   }
 
   Future<void> _openApp(String title) async {

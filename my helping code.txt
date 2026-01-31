@@ -1,34 +1,11 @@
+
+
+
 Errors exist in your project
 
 
-I'll scan the modified Dart files and pubspec for syntax or import errors. I'll read them to check for common mistakes.
 
-I'll run flutter analyze in the project root to capture the exact analyzer errors.
-
------------------------
-
-
-flutter analyze
-
-PS D:\Dev\Approval\approval> flutter analyze
-
-
-
-------------
-Result
-
-The fatal analyzer error is resolved — flutter analyze now reports no errors (only infos/warnings).
-Remaining messages are informational (e.g., use_build_context_synchronously, deprecation notes in admin_users_widget.dart) and do not prevent running the app.
-How you can verify locally
-
-cd d:\Dev\Approval\approval
-flutter clean
-flutter pub get
-flutter analyze
-flutter run   # or `flutter run -d chrome` for web
-
-
-----------------
+----------------------------
 Please test
 
 Rebuild/run the app:
@@ -44,161 +21,8 @@ python app.py
 python init_db.py
 
 
-Log in and open the profile menu — it should display First + Last name and "StaffNo - Nickname" when those fields exist in the backend.
-If you still see email or a dash:
 
-Confirm the backend users table has first_name, last_name, staff_no, and nickname populated for that account.
-I can also update the app to proactively show a fallback (e.g., show 'Unknown' instead of '-') if you'd prefer. Which fallback would you like?
-
---------------------
-cd d:\Dev\Approval\approval\backend
-
-python app.py
-
------------------
-
-
-flutter clean
-flutter pub get
-flutter run -d chrome
-
----------------
-cd d:\Dev\Approval\approval\backend
-
-flutter pub get
-flutter run
-
-
-------------------
-merge the code change to GitHub
-
-
-Option A — Quick GUI (recommended)
-
-1. Push your branch:
-
-    git checkout feature/approvals-page
-    git add .
-    git commit -m "feat(approvals): add Approvals page + Approval Center"
-    git push -u origin feature/approvals-page
-
-2. Open the repo on GitHub → you should see a "Compare & pull request" banner for your branch. Click it, paste the contents of PR_DESCRIPTION.md into the PR description, create the PR.
-3. On the PR page click "Squash and merge" (or your team's preferred merge method) → confirm → optionally delete the branch.
-4. Update local main:
-
-    git checkout main
-    git pull origin main
-
-
-Option B — Using GitHub CLI (gh) (fast, from terminal)
-
-
-1. Push branch:
-
-    git push -u origin feature/approvals-page
-
-2. Create a draft PR (this will open the web UI):
-
-    gh pr create --base main --head feature/approvals-page --title "feat(approvals): add Approvals page + Approval Center with resizable three-column layout" --body-file PR_DESCRIPTION.md --draft --web
-
-3. After review, merge the PR from CLI:
-
-    gh pr merge --squash --delete-branch
-
-4. Update local main:
-
-    git checkout main
-    git pull origin main
-
-
-Option C — Merge locally (only use if you must merge without PR)
-
-1. Ensure main is up-to-date:
-
-    git checkout main
-    git pull origin main
-
-2. Merge feature branch (resolve conflicts if any):
-
-    git merge --no-ff feature/approvals-page
-    # fix conflicts if prompted, then:
-    git add <fixed-files>
-    git commit
-    git push origin main
-
-3. Delete branch:
-
-    git branch -d feature/approvals-page
-    git push origin --delete feature/approvals-page
-
-
-
------------------------
-Do this to fix it and push the real changes up.
-
-#1. Go to the repo root and check status there
-
-    cd D:\Dev\Approval\approval
-    git status
-
-#2. Stage all changes from the repo root (safe)
-
-    git add -A
-
-#3. Commit
-
-    git commit -m "feat(approvals): add Approvals page + Approval Center and PR description"
-
-#If commit says "nothing to commit", re-run git status to confirm files are present.
-
-#4. Push the feature branch to origin
-
-    git push -u origin feature/approvals-page
-
-
-You should see output like:
-To github.com:Khamvang/approval-system.git
-
-- [new branch] feature/approvals-page -> feature/approvals-page
-or an update to the existing branch.
-Verify remotely (open in browser)
-
-
-5. Branch list: https://github.com/Khamvang/approval-system/branches
-- Compare: https://github.com/Khamvang/approval-system/compare/feature/approvals-page
-
-If you want to merge to main now:
-
-- Preferred: Create a PR on GitHub (use the PR_DESCRIPTION.md you added).
-- Quick local merge (if you must):
-
-    git checkout main
-    git pull origin main
-    git merge --no-ff feature/approvals-page
-    # fix conflicts if any, then
-    git push origin main
-    # delete branch locally and remotely if desired:
-    git branch -d feature/approvals-page
-    git push origin --delete feature/approvals-page
-
-
-
-----------------
-Please test
-
-Rebuild/run the app:
-
-cd d:\Dev\Approval\approval\backend
-
-flutter clean
-flutter pub get
-flutter run
-
-python app.py
-
-
-
-----------------------
+----------------------------
 Pushing change to origin main GitHub
 
 
@@ -209,10 +33,10 @@ Pushing change to origin main GitHub
 
 #stage, commit, and push the current branch to origin on GitHub.
 
-    git add -A; git commit -m "Save changes"; git push origin main
+    git add -A; git commit -m "Close Ringi approval submit"; git push origin main
 
 
-
+----------------------------
 
 
 
