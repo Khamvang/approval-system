@@ -33,7 +33,7 @@ Pushing change to origin main GitHub
 
 #stage, commit, and push the current branch to origin on GitHub.
 
-    git add -A; git commit -m "Close Ringi approval submit"; git push origin main
+    git add -A; git commit -m "Close Ringi Details form"; git push origin main
 
 
 ----------------------------

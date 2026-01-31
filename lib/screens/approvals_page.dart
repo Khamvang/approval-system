@@ -86,6 +86,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   String _selectedCenterApp = 'System Modification Ringi';
   Map<String, dynamic>? _selectedCase;
   bool _loadingCase = false;
+  bool _acting = false;
   // resizable panels with default widths: left 250px, middle 350px; right auto-fills remainder ..
   double _leftPanelWidth = 250;
   double _middlePanelWidth = 350;
@@ -564,11 +565,11 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                   color: Colors.white,
                   child: Row(
                     children: [
-                      Expanded(child: ElevatedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Approve (not wired)'))), child: const Text('Approve'))),
+                      Expanded(child: ElevatedButton(onPressed: _acting ? null : () => _confirmAndPerform('approve'), child: _acting ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Approve'))),
                       const SizedBox(width: 8),
-                      Expanded(child: ElevatedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Send Back (not wired)'))), style: ElevatedButton.styleFrom(backgroundColor: Colors.orange), child: const Text('Send Back'))),
+                      Expanded(child: ElevatedButton(onPressed: _acting ? null : () => _confirmAndPerform('send_back'), style: ElevatedButton.styleFrom(backgroundColor: Colors.orange), child: _acting ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Send Back'))),
                       const SizedBox(width: 8),
-                      Expanded(child: ElevatedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reject (not wired)'))), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Reject'))),
+                      Expanded(child: ElevatedButton(onPressed: _acting ? null : () => _confirmAndPerform('reject'), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: _acting ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Reject'))),
                     ],
                   ),
                 ),
@@ -806,6 +807,63 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       return '${l.year}-${two(l.month)}-${two(l.day)} ${two(l.hour)}:${two(l.minute)}:${two(l.second)}';
     } catch (_) {
       return src.toString();
+    }
+  }
+
+  Future<void> _confirmAndPerform(String result) async {
+    if (_selectedCase == null) return;
+    final commentController = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(result == 'approve' ? 'Approve' : (result == 'reject' ? 'Reject' : 'Send Back')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Optional comment:'),
+            TextField(controller: commentController, maxLines: 3),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirm')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _performAction(result, comment: commentController.text.trim());
+  }
+
+  Future<void> _performAction(String result, {String? comment}) async {
+    if (_selectedCase == null) return;
+    int? reqId;
+    final id = _selectedCase!['id'];
+    if (id is int) reqId = id;
+    else if (id is String) reqId = int.tryParse(id);
+    if (reqId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot perform action: invalid request id')));
+      return;
+    }
+
+    setState(() { _acting = true; });
+    try {
+      final user = await Session.loadUser() ?? {};
+      final actorEmail = (user['email'] ?? '').toString();
+      final actorName = ('${user['first_name'] ?? ''} ${user['last_name'] ?? ''}').trim();
+      int? actorId;
+      try { actorId = int.tryParse((user['id'] ?? user['actor_id'] ?? '').toString()); } catch (_) {}
+
+      final updated = await CloseContractApi.actOnRequest(reqId, result: result, comment: comment?.isEmpty ?? true ? null : comment, actorEmail: actorEmail.isEmpty ? null : actorEmail, actorId: actorId, actorName: actorName.isEmpty ? null : actorName);
+      if (!mounted) return;
+      setState(() { _selectedCase = Map<String, dynamic>.from(updated); });
+      // refresh list
+      if (_selectedCenterApp == 'Close Contract Approval Ringi') await _loadCloseContractCases();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Action applied')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Action failed: $e')));
+    } finally {
+      if (mounted) setState(() { _acting = false; });
     }
   }
 
