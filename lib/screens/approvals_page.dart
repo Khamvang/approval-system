@@ -1,5 +1,9 @@
 // ignore_for_file: use_build_context_synchronously
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import '../services/session.dart';
 import 'close_contract_approval_page.dart';
 import '../services/close_contract_api.dart';
@@ -504,7 +508,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                                 scrollDirection: Axis.horizontal,
                                 child: DataTable(
                                   headingRowHeight: 28,
-                                  dataRowHeight: 28,
+                                  dataRowMinHeight: 28,
+                                  dataRowMaxHeight: 28,
                                   horizontalMargin: 28,
                                   columnSpacing: 28,
                                   columns: const [
@@ -536,10 +541,10 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                                 columnWidths: const {0: IntrinsicColumnWidth(), 1: FlexColumnWidth()},
                                 defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                                 children: [
-                                  _buildKeyValueRow('Principal remaining', '${_selectedCase!['principal_remaining'] ?? ''}'),
-                                  _buildKeyValueRow('Interest remaining', '${_selectedCase!['interest_remaining'] ?? ''}'),
-                                  _buildKeyValueRow('Penalty remaining', '${_selectedCase!['penalty_remaining'] ?? ''}'),
-                                  _buildKeyValueRow('Other remaining', '${_selectedCase!['others_remaining'] ?? ''}'),
+                                  _buildKeyValueRow('Principal remaining', _formatAmount(_selectedCase!['principal_remaining'] ?? '')),
+                                  _buildKeyValueRow('Interest remaining', _formatAmount(_selectedCase!['interest_remaining'] ?? '')),
+                                  _buildKeyValueRow('Penalty remaining', _formatAmount(_selectedCase!['penalty_remaining'] ?? '')),
+                                  _buildKeyValueRow('Other remaining', _formatAmount(_selectedCase!['others_remaining'] ?? '')),
                                 ],
                               ),
                               const SizedBox(height: 8),
@@ -553,18 +558,18 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                                 columnWidths: const {0: IntrinsicColumnWidth(), 1: FlexColumnWidth()},
                                 defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                                 children: [
-                                  _buildKeyValueRow('Principal (willing)', '${_selectedCase!['principal_willing'] ?? ''}'),
-                                  _buildKeyValueRow('Interest (willing)', '${_selectedCase!['interest_willing'] ?? ''}'),
+                                  _buildKeyValueRow('Principal (willing)', _formatAmount(_selectedCase!['principal_willing'] ?? '')),
+                                  _buildKeyValueRow('Interest (willing)', _formatAmount(_selectedCase!['interest_willing'] ?? '')),
                                   _buildKeyValueRow('Interest months', '${_selectedCase!['interest_months'] ?? ''}'),
-                                  _buildKeyValueRow('Penalty (willing)', '${_selectedCase!['penalty_willing'] ?? ''}'),
-                                  _buildKeyValueRow('Other (willing)', '${_selectedCase!['others_willing'] ?? ''}'),
+                                  _buildKeyValueRow('Penalty (willing)', _formatAmount(_selectedCase!['penalty_willing'] ?? '')),
+                                  _buildKeyValueRow('Other (willing)', _formatAmount(_selectedCase!['others_willing'] ?? '')),
                                 ],
                               ),
                               const SizedBox(height: 8),
                             ],
 
                             // Remark after payment history — render as larger readable block
-                            if ((_selectedCase!['remark'] ?? '').toString().isNotEmpty) ...[
+                            if ((_selectedCase!['remark'] ?? '').toString().isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 8.0, bottom: 12.0),
                                 child: Column(
@@ -581,7 +586,62 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                                   ],
                                 ),
                               ),
-                            ],
+
+                            // Attachments (from DB: attachment_url)
+                            // Attachments (flexible extraction from multiple DB fields)
+                            if ((_selectedCase!['remark'] ?? '').toString().isNotEmpty)
+                              Builder(builder: (ctx) {
+                                final urls = _extractAttachmentUrls(_selectedCase!);
+                                if (urls.isEmpty) return const SizedBox.shrink();
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    const SelectableText('Attachment', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 6),
+                                    for (final u in urls)
+                                      Padding(
+                                        padding: const EdgeInsets.only(bottom: 6.0),
+                                        child: Row(children: [
+                                          Expanded(child: SelectableText(_attachmentLabel(u), maxLines: 2, style: const TextStyle(color: Colors.blue))),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            tooltip: 'Open',
+                                            onPressed: () async {
+                                              final full = _normalizeAttachmentUrl(u);
+                                              final uri = Uri.tryParse(full);
+                                              if (uri == null) {
+                                                if (!mounted) return;
+                                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid URL')));
+                                                return;
+                                              }
+                                              try {
+                                                if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+                                                  if (!mounted) return;
+                                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open URL')));
+                                                }
+                                              } catch (e) {
+                                                if (!mounted) return;
+                                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error opening URL: $e')));
+                                              }
+                                            },
+                                            icon: const Icon(Icons.open_in_new, size: 18),
+                                          ),
+                                          IconButton(
+                                            tooltip: 'Copy URL',
+                                            onPressed: () async {
+                                              final full = _normalizeAttachmentUrl(u);
+                                              await Clipboard.setData(ClipboardData(text: full));
+                                              if (!mounted) return;
+                                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Attachment URL copied')));
+                                            },
+                                            icon: const Icon(Icons.copy, size: 18),
+                                          ),
+                                        ]),
+                                      ),
+                                    const SizedBox(height: 12),
+                                  ],
+                                );
+                              }),
                           ],
                         ),
                       ),
@@ -891,6 +951,38 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     }
   }
 
+  // Format numeric amounts with thousand separators while preserving decimals.
+  String _formatAmount(dynamic v) {
+    if (v == null) return '';
+    final s = v.toString().trim();
+    if (s.isEmpty) return '';
+    final cleaned = s.replaceAll(',', '');
+    // accept integers or decimals, optionally negative
+    final m = RegExp(r'^-?\d+(?:\.\d+)?$').firstMatch(cleaned);
+    if (m == null) return s; // not a plain number, return original
+    final negative = cleaned.startsWith('-');
+    final parts = cleaned.replaceFirst('-', '').split('.');
+    final intPart = parts[0];
+    final intFormatted = intPart.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',');
+    if (parts.length > 1) {
+      return (negative ? '-' : '') + '$intFormatted.${parts[1]}';
+    }
+    return (negative ? '-' : '') + intFormatted;
+  }
+
+  // Normalize attachment URL to an absolute URL using the same host logic as the API.
+  String _normalizeAttachmentUrl(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return s;
+    if (s.startsWith('http://') || s.startsWith('https://')) return s;
+    if (s.startsWith('//')) return 'https:$s';
+    final host = kIsWeb
+        ? 'http://localhost:5000'
+        : (defaultTargetPlatform == TargetPlatform.android ? 'http://10.0.2.2:5000' : 'http://localhost:5000');
+    if (s.startsWith('/')) return '$host$s';
+    return '$host/${s}';
+  }
+
   // removed legacy fallbacks for paid_term_total/paid_term_display — use DB fields only
 
   String _paidTermRatio(Map<String, dynamic> c) {
@@ -906,6 +998,78 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       return paid;
     }
     return '$paid / $total';
+  }
+
+  // Extract attachment URLs from a selected case record. Supports multiple field names and formats.
+  List<String> _extractAttachmentUrls(Map<String, dynamic> c) {
+    final candidates = ['attachment_url', 'attachment', 'attachments', 'attachment_urls', 'files', 'file_urls'];
+    dynamic raw;
+    for (final k in candidates) {
+      if (c.containsKey(k) && c[k] != null) {
+        raw = c[k];
+        break;
+      }
+    }
+    if (raw == null) return [];
+
+    final List<String> urls = [];
+    if (raw is List) {
+      for (final e in raw) {
+        if (e == null) continue;
+        if (e is Map && (e['url'] ?? e['attachment_url'] ?? e['path']) != null) {
+          urls.add((e['url'] ?? e['attachment_url'] ?? e['path']).toString());
+        } else {
+          urls.add(e.toString());
+        }
+      }
+      return urls.where((s) => s.trim().isNotEmpty).toList();
+    }
+
+    if (raw is String) {
+      final s = raw.trim();
+      if (s.isEmpty) return [];
+      // try JSON array
+      try {
+        final decoded = jsonDecode(s);
+        if (decoded is List) {
+          for (final e in decoded) {
+            if (e == null) continue;
+            if (e is Map && (e['url'] ?? e['attachment_url'] ?? e['path']) != null) {
+              urls.add((e['url'] ?? e['attachment_url'] ?? e['path']).toString());
+            } else {
+              urls.add(e.toString());
+            }
+          }
+          return urls.where((s) => s.trim().isNotEmpty).toList();
+        }
+      } catch (_) {}
+
+      // comma-separated fallback
+      if (s.contains(',')) {
+        urls.addAll(s.split(',').map((p) => p.trim()).where((p) => p.isNotEmpty));
+        return urls;
+      }
+
+      // single url
+      return [s];
+    }
+
+    // Map-like fallback
+    if (raw is Map) {
+      if ((raw['url'] ?? raw['attachment_url'] ?? raw['path']) != null) {
+        return [(raw['url'] ?? raw['attachment_url'] ?? raw['path']).toString()];
+      }
+    }
+
+    return [];
+  }
+
+  String _attachmentLabel(String url) {
+    try {
+      final u = Uri.tryParse(url);
+      if (u != null && u.pathSegments.isNotEmpty) return u.pathSegments.last;
+    } catch (_) {}
+    return url;
   }
 
   Future<void> _confirmAndPerform(String result) async {
@@ -1039,7 +1203,6 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       final dept = (user['department'] ?? '').toString();
       final displayName = (first.isNotEmpty || last.isNotEmpty) ? '$first $last' : (user['email'] ?? '');
 
-      // ignore: use_build_context_synchronously
       final selected = await showMenu<int>(
         context: context,
         position: RelativeRect.fromLTRB(globalPos.dx, globalPos.dy, globalPos.dx, globalPos.dy),
@@ -1096,7 +1259,6 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
         }
       }
 
-      // ignore: use_build_context_synchronously
       final sel = await showMenu<Map>(
         context: context,
         position: RelativeRect.fromLTRB(parentPos.dx + 200, parentPos.dy, parentPos.dx + 200, parentPos.dy),

@@ -33,7 +33,7 @@ python init_db.py
 
 #stage, commit, and push the current branch to origin on GitHub.
 
-    git add -A; git commit -m "Updated Approval details form"; git push origin main
+    git add -A; git commit -m "Added Attachment file"; git push origin main
 
 
 ----------------------------
