@@ -1,15 +1,16 @@
+// ignore_for_file: use_build_context_synchronously
 import 'package:flutter/material.dart';
 import '../services/session.dart';
 import 'close_contract_approval_page.dart';
 import '../services/close_contract_api.dart';
 
 class ApprovalsPage extends StatefulWidget {
-  const ApprovalsPage({Key? key}) : super(key: key);
+  const ApprovalsPage({super.key});
 
-  static Route route() => MaterialPageRoute(builder: (_) => const ApprovalsPage());
+  static Route<void> route() => MaterialPageRoute<void>(builder: (context) => const ApprovalsPage());
 
   @override
-  _ApprovalsPageState createState() => _ApprovalsPageState();
+  State<ApprovalsPage> createState() => _ApprovalsPageState();
 }
 
 class _ApprovalsPageState extends State<ApprovalsPage> {
@@ -100,7 +101,9 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   Future<void> _loadCloseContractCases() async {
     try {
       final items = await CloseContractApi.listRequests(includeActions: true);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         // store items as-case list; normalize some display fields
         _loadedCases['Close Contract Approval Ringi'] = items.map((it) {
@@ -290,7 +293,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
               child: ListView.separated(
                 padding: const EdgeInsets.all(8),
                 itemCount: sectionList.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
                 itemBuilder: (context, si) {
                   final section = sectionList[si];
                   final apps = _centerSections[section] ?? [];
@@ -326,7 +329,9 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                                     _selectedCenterApp = a;
                                     _selectedCase = null;
                                   });
-                                  if (a == 'Close Contract Approval Ringi') await _loadCloseContractCases();
+                                  if (a == 'Close Contract Approval Ringi') {
+                                    await _loadCloseContractCases();
+                                  }
                                 },
                                 selected: sel,
                                 selectedTileColor: Colors.indigo.withAlpha(30),
@@ -354,7 +359,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
               padding: const EdgeInsets.all(12),
               child: ListView.separated(
                 itemCount: cases.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
                 itemBuilder: (context, i) {
                   final c = cases[i];
                   final selected = _selectedCase != null && _selectedCase!['id'] == c['id'];
@@ -363,23 +368,30 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                       // if item has numeric id, fetch full details from backend
                       final id = c['id'];
                       int? reqId;
-                      if (id is int) reqId = id;
-                      else if (id is String) reqId = int.tryParse(id);
+                      if (id is int) {
+                        reqId = id;
+                      } else if (id is String) {
+                        reqId = int.tryParse(id);
+                      }
                       if (reqId != null) {
                         setState(() { _loadingCase = true; _selectedCase = null; });
                         try {
                           final detailed = await CloseContractApi.getRequest(reqId);
-                          if (!mounted) return;
+                          if (!mounted) {
+                            return;
+                          }
                           setState(() { _selectedCase = Map<String, dynamic>.from(detailed); });
                         } catch (e) {
                           // fallback to shallow case
-                          if (!mounted) return;
+                          if (!mounted) {
+                            return;
+                          }
                           setState(() { _selectedCase = Map<String, dynamic>.from(c); });
                         } finally {
                           if (mounted) setState(() { _loadingCase = false; });
                         }
                       } else {
-                        setState(() => _selectedCase = Map<String, dynamic>.from(c));
+                        setState(() { _selectedCase = Map<String, dynamic>.from(c); });
                       }
                     },
                           child: Container(
@@ -651,7 +663,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: _recommended.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               final title = _recommended[index]['title']!;
               return GestureDetector(
@@ -797,11 +809,16 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   }
 
   String _formatDateTime(dynamic src) {
-    if (src == null) return '';
+    if (src == null) {
+      return '';
+    }
     try {
       DateTime dt;
-      if (src is DateTime) dt = src;
-      else dt = DateTime.tryParse(src.toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      if (src is DateTime) {
+        dt = src;
+      } else {
+        dt = DateTime.tryParse(src.toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      }
       final l = dt.toLocal();
       String two(int n) => n.toString().padLeft(2, '0');
       return '${l.year}-${two(l.month)}-${two(l.day)} ${two(l.hour)}:${two(l.minute)}:${two(l.second)}';
@@ -810,25 +827,27 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     }
   }
 
-  String _paidTermDisplay(Map<String, dynamic> c) {
-    if (c.containsKey('paid_term') && (c['paid_term']?.toString().trim().isNotEmpty ?? false)) return c['paid_term'].toString();
-    if (c.containsKey('paid_term_total') && (c['paid_term_total']?.toString().trim().isNotEmpty ?? false)) return c['paid_term_total'].toString();
-    if (c.containsKey('paid_term_display') && (c['paid_term_display']?.toString().trim().isNotEmpty ?? false)) return c['paid_term_display'].toString();
-    return '';
-  }
+  // removed legacy fallbacks for paid_term_total/paid_term_display — use DB fields only
 
   String _paidTermRatio(Map<String, dynamic> c) {
     final paid = (c['paid_term']?.toString().trim() ?? '');
-    // prefer explicit total_term, then fall back to paid_term_total if present
-    final total = (c['total_term']?.toString().trim() ?? c['paid_term_total']?.toString().trim() ?? '');
-    if (paid.isEmpty && total.isEmpty) return '';
-    if (paid.isEmpty) return '/ $total';
-    if (total.isEmpty) return paid;
+    final total = (c['total_term']?.toString().trim() ?? '');
+    if (paid.isEmpty && total.isEmpty) {
+      return '';
+    }
+    if (paid.isEmpty) {
+      return '/ $total';
+    }
+    if (total.isEmpty) {
+      return paid;
+    }
     return '$paid / $total';
   }
 
   Future<void> _confirmAndPerform(String result) async {
-    if (_selectedCase == null) return;
+    if (_selectedCase == null) {
+      return;
+    }
     final commentController = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
@@ -847,16 +866,23 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
         ],
       ),
     );
-    if (ok != true) return;
+    if (ok != true) {
+      return;
+    }
     await _performAction(result, comment: commentController.text.trim());
   }
 
   Future<void> _performAction(String result, {String? comment}) async {
-    if (_selectedCase == null) return;
+    if (_selectedCase == null) {
+      return;
+    }
     int? reqId;
     final id = _selectedCase!['id'];
-    if (id is int) reqId = id;
-    else if (id is String) reqId = int.tryParse(id);
+    if (id is int) {
+      reqId = id;
+    } else if (id is String) {
+      reqId = int.tryParse(id);
+    }
     if (reqId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot perform action: invalid request id')));
       return;
@@ -871,13 +897,20 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       try { actorId = int.tryParse((user['id'] ?? user['actor_id'] ?? '').toString()); } catch (_) {}
 
       final updated = await CloseContractApi.actOnRequest(reqId, result: result, comment: comment?.isEmpty ?? true ? null : comment, actorEmail: actorEmail.isEmpty ? null : actorEmail, actorId: actorId, actorName: actorName.isEmpty ? null : actorName);
-      if (!mounted) return;
+                        if (!mounted) {
+                          return;
+                        }
       setState(() { _selectedCase = Map<String, dynamic>.from(updated); });
       // refresh list
       if (_selectedCenterApp == 'Close Contract Approval Ringi') await _loadCloseContractCases();
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Action applied')));
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Action failed: $e')));
     } finally {
       if (mounted) setState(() { _acting = false; });
@@ -887,7 +920,9 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   Future<void> _openApp(String title) async {
     if (title == 'Close Contract Approval Ringi') {
       final user = await Session.loadUser();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => CloseContractApprovalPage(user: user)));
       return;
     }
@@ -911,6 +946,9 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       onTap: () async {
         setState(() => _selectedIndex = index);
         final user = await Session.loadUser();
+        if (!mounted) {
+          return;
+        }
         Navigator.pushReplacementNamed(context, route, arguments: user);
       },
       child: Container(
@@ -937,6 +975,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       final dept = (user['department'] ?? '').toString();
       final displayName = (first.isNotEmpty || last.isNotEmpty) ? '$first $last' : (user['email'] ?? '');
 
+      // ignore: use_build_context_synchronously
       final selected = await showMenu<int>(
         context: context,
         position: RelativeRect.fromLTRB(globalPos.dx, globalPos.dy, globalPos.dx, globalPos.dy),
@@ -993,29 +1032,40 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
         }
       }
 
+      // ignore: use_build_context_synchronously
       final sel = await showMenu<Map>(
         context: context,
         position: RelativeRect.fromLTRB(parentPos.dx + 200, parentPos.dy, parentPos.dx + 200, parentPos.dy),
         items: items,
       );
 
-      if (!mounted) return;
-      if (sel == null) return;
+      if (!mounted) {
+        return;
+      }
+      if (sel == null) {
+        return;
+      }
 
       if (sel.isEmpty) {
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
         Navigator.pushReplacementNamed(context, '/');
         return;
       }
 
       final email = (sel['email'] ?? '').toString();
-      if (email.isEmpty) return;
+      if (email.isEmpty) {
+        return;
+      }
 
       final saved = await Session.getSavedPasswordForEmail(email);
       if (saved == null) {
         final pwController = TextEditingController();
         bool rememberChoice = false;
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
         final ok = await showDialog<bool>(context: context, builder: (ctx) {
           return AlertDialog(
             title: Text('Enter password for $email'),
@@ -1029,7 +1079,9 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
             actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sign In'))],
           );
         });
-        if (ok != true) return;
+        if (ok != true) {
+          return;
+        }
       }
 
       try {

@@ -436,7 +436,7 @@ class _CloseContractApprovalPageState extends State<CloseContractApprovalPage> {
                 ]),
                 trailing: Icon(Icons.circle, size: 14, color: color),
               );
-            }).toList(),
+            }),
             if (_canActOnCurrent()) ...[
               const Divider(),
               Wrap(
