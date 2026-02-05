@@ -324,12 +324,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       const minMiddle = 260.0;
       const minRight = 240.0;
       const gutter = 16.0; // two 8px drag handles
-
-      // Clamp widths to keep panels visible and leave room for the right pane.
-      _leftPanelWidth = _leftPanelWidth.clamp(minLeft, total - _middlePanelWidth - minRight - gutter);
-      _middlePanelWidth = _middlePanelWidth.clamp(minMiddle, total - _leftPanelWidth - minRight - gutter);
-
-      // rightWidth is no longer used (right panel is Expanded)
+      final minTotal = minLeft + minMiddle + minRight + gutter;
+      final isCompact = total < minTotal;
 
       // Left panel
       final leftPanel = Container(
@@ -370,7 +366,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                           Column(
                             children: apps.map((a) {
                               final sel = a == _selectedCenterApp;
-                                return ListTile(
+                              return ListTile(
                                 dense: true,
                                 title: SelectableText(a, style: TextStyle(color: sel ? Colors.indigo : Colors.black87)),
                                 onTap: () async {
@@ -401,7 +397,36 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       final middlePanel = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(padding: const EdgeInsets.all(12), color: Colors.white, child: Row(children: [SelectableText(_selectedCenterApp, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), const Spacer(), DropdownButton<String>(value: 'All Time', items: const [DropdownMenuItem(value: 'All Time', child: Text('All Time'))], onChanged: (_) {}), const SizedBox(width: 8), IconButton(icon: const Icon(Icons.refresh), tooltip: 'Refresh', onPressed: _selectedCenterApp == 'Close Contract Approval Ringi' ? () => _loadCloseContractCases() : null)])),
+          Container(
+            padding: const EdgeInsets.all(12),
+            color: Colors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _selectedCenterApp,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                DropdownButton<String>(
+                  value: 'All Time',
+                  items: const [DropdownMenuItem(value: 'All Time', child: Text('All Time'))],
+                  onChanged: (_) {},
+                  underline: const SizedBox.shrink(),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Refresh',
+                  onPressed: _selectedCenterApp == 'Close Contract Approval Ringi' ? () => _loadCloseContractCases() : null,
+                ),
+              ],
+            ),
+          ),
           Expanded(
             child: Container(
               color: const Color(0xFFF6F7FB),
@@ -781,6 +806,28 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
           ),
         );
       }
+
+      // Mobile / narrow layout: stack panels vertically to avoid invalid clamp widths.
+      if (isCompact) {
+        final screenHeight = MediaQuery.of(context).size.height;
+        final detailHeight = (screenHeight * 0.6).clamp(320.0, 720.0);
+        return ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            SizedBox(height: 240, child: leftPanel),
+            const Divider(height: 1),
+            SizedBox(height: 300, child: middlePanel),
+            const Divider(height: 1),
+            SizedBox(height: detailHeight, child: rightPanel),
+          ],
+        );
+      }
+
+      // Clamp widths to keep panels visible and leave room for the right pane (desktop / wide screens).
+      _leftPanelWidth = _leftPanelWidth.clamp(minLeft, total - _middlePanelWidth - minRight - gutter);
+      _middlePanelWidth = _middlePanelWidth.clamp(minMiddle, total - _leftPanelWidth - minRight - gutter);
+
+      // rightWidth is no longer used (right panel is Expanded)
 
       return Row(
         children: [
