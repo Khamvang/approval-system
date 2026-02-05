@@ -28,12 +28,16 @@ python init_db.py
 
 #To run git commands to inspect status, branch, and remotes.
 
-    git status --porcelain; git rev-parse --abbrev-ref HEAD; git remote -v
+    git status --porcelain
+    git rev-parse --abbrev-ref HEAD 
+    git remote -v
 
 
 #stage, commit, and push the current branch to origin on GitHub.
 
-    git add -A; git commit -m "Updated Approval logic and add resubmit button"; git push origin main
+    git add -A
+    git commit -m "Updated backend: add_admin script and users schema migration"
+    git push origin main
 
 
 ----------------------------
