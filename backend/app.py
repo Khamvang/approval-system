@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 from uuid import uuid4
 
-load_dotenv()
+load_dotenv(override=True)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -49,7 +49,7 @@ def get_sqlite_conn():
 def get_mysql_conn():
     import mysql.connector
     host = os.getenv('DB_HOST', '127.0.0.1')
-    port = int(os.getenv('DB_PORT', '3306'))
+    port = int(os.getenv('DB_PORT', '3308'))
     user = os.getenv('DB_USER', 'root')
     password = os.getenv('DB_PASS', '')
     db_name = os.getenv('DB_NAME', 'approval_db')
