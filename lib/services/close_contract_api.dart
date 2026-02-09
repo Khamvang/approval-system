@@ -115,7 +115,7 @@ class CloseContractApi {
     return (data['item'] as Map<String, dynamic>?) ?? {};
   }
 
-  static Future<Map<String, dynamic>> actOnRequest(int id, {required String result, String? comment, String? actorEmail, int? actorId, String? actorName, String? actorRole}) async {
+  static Future<Map<String, dynamic>> actOnRequest(int id, {required String result, String? comment, String? actorEmail, int? actorId, String? actorName, String? actorRole, List<String>? attachmentUrls}) async {
     final body = {
       'result': result,
       if (comment != null) 'comment': comment,
@@ -123,6 +123,7 @@ class CloseContractApi {
       if (actorId != null) 'actor_id': actorId,
       if (actorName != null) 'actor_name': actorName,
       if (actorRole != null) 'actor_role': actorRole,
+      if (attachmentUrls != null && attachmentUrls.isNotEmpty) 'attachment_urls': attachmentUrls,
     };
     final resp = await http.post(_uri('/api/close-contracts/$id/action'), headers: {'Content-Type': 'application/json'}, body: json.encode(body));
     if (resp.statusCode != 200) {

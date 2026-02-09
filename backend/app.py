@@ -3,6 +3,7 @@ import logging
 from flask_cors import CORS
 import os
 import sqlite3
+import json
 from werkzeug.security import check_password_hash
 from werkzeug.security import generate_password_hash
 from dotenv import load_dotenv
@@ -11,7 +12,6 @@ from datetime import datetime
 from uuid import uuid4
 
 load_dotenv(override=True)
-
 logging.basicConfig(level=logging.INFO)
 
 DB_TYPE = os.getenv('DB_TYPE', 'sqlite')
@@ -111,9 +111,15 @@ def ensure_close_contract_tables():
             actor_id INT,
             actor_name VARCHAR(255),
             acted_at VARCHAR(64),
+            attachments TEXT,
             FOREIGN KEY (request_id) REFERENCES close_contract_forms(id)
         )
         ''')
+        # add attachments column if missing (MySQL)
+        try:
+            cur.execute('ALTER TABLE close_contract_actions ADD COLUMN attachments TEXT')
+        except Exception:
+            pass
         # comments table for free-form user comments on a request
         cur.execute('''
         CREATE TABLE IF NOT EXISTS close_contract_comments (
@@ -181,9 +187,15 @@ def ensure_close_contract_tables():
             actor_id INTEGER,
             actor_name TEXT,
             acted_at TEXT,
+            attachments TEXT,
             FOREIGN KEY (request_id) REFERENCES close_contract_forms(id)
         )
         ''')
+        # add attachments column if missing (SQLite)
+        try:
+            cur.execute('ALTER TABLE close_contract_actions ADD COLUMN attachments TEXT')
+        except Exception:
+            pass
         # comments table for free-form user comments on a request
         cur.execute('''
         CREATE TABLE IF NOT EXISTS close_contract_comments (
@@ -868,6 +880,9 @@ def close_contract_update(request_id):
     if is_multipart:
         payload = request.form.to_dict()
 
+    # allow caller to bypass status/current_step reset (used for attachment-only patch)
+    skip_reset = str(payload.get('skip_reset', '')).lower() in ('1', 'true', 'yes')
+
     def _to_int(v):
         try:
             return int(v) if v not in (None, '') else None
@@ -916,11 +931,12 @@ def close_contract_update(request_id):
     updates.append('updated_at' + (' = %s' if DB_TYPE.lower() == 'mysql' else ' = ?'))
     params.append(now_iso())
 
-    # when resubmitting, reset status/current_step to restart approval flow
-    updates.append('status' + (' = %s' if DB_TYPE.lower() == 'mysql' else ' = ?'))
-    params.append('under_review')
-    updates.append('current_step' + (' = %s' if DB_TYPE.lower() == 'mysql' else ' = ?'))
-    params.append('credit')
+    # when resubmitting, reset status/current_step to restart approval flow (unless explicitly skipped)
+    if not skip_reset:
+        updates.append('status' + (' = %s' if DB_TYPE.lower() == 'mysql' else ' = ?'))
+        params.append('under_review')
+        updates.append('current_step' + (' = %s' if DB_TYPE.lower() == 'mysql' else ' = ?'))
+        params.append('credit')
 
     if not updates:
         conn.close()
@@ -932,10 +948,11 @@ def close_contract_update(request_id):
             cur = conn.cursor()
             cur.execute(f'UPDATE close_contract_forms SET {q} WHERE id = %s', (*params, request_id))
             conn.commit()
-            # add resubmit action record
-            acted_at = now_iso()
-            cur.execute('INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', (request_id, 'submit', 'Submit', 'Submitter', 'resubmitted', payload.get('remark') or '', payload.get('created_by_email'), _to_int(payload.get('created_by_id')), payload.get('created_by_name'), acted_at))
-            conn.commit()
+            # add resubmit action record only when not skipping reset
+            if not skip_reset:
+                acted_at = now_iso()
+                cur.execute('INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', (request_id, 'submit', 'Submit', 'Submitter', 'resubmitted', payload.get('remark') or '', payload.get('created_by_email'), _to_int(payload.get('created_by_id')), payload.get('created_by_name'), acted_at))
+                conn.commit()
             updated = _load_request(conn, request_id)
             updated = close_contract_row_to_dict(updated)
             updated['actions'] = _fetch_actions_for_request(conn, request_id)
@@ -947,9 +964,10 @@ def close_contract_update(request_id):
             cur = conn.cursor()
             cur.execute(f'UPDATE close_contract_forms SET {q} WHERE id = ?', (*params, request_id))
             conn.commit()
-            acted_at = now_iso()
-            cur.execute('INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (request_id, 'submit', 'Submit', 'Submitter', 'resubmitted', payload.get('remark') or '', payload.get('created_by_email'), _to_int(payload.get('created_by_id')), payload.get('created_by_name'), acted_at))
-            conn.commit()
+            if not skip_reset:
+                acted_at = now_iso()
+                cur.execute('INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (request_id, 'submit', 'Submit', 'Submitter', 'resubmitted', payload.get('remark') or '', payload.get('created_by_email'), _to_int(payload.get('created_by_id')), payload.get('created_by_name'), acted_at))
+                conn.commit()
             updated = _load_request(conn, request_id)
             updated = close_contract_row_to_dict(updated)
             updated['actions'] = _fetch_actions_for_request(conn, request_id)
@@ -1045,19 +1063,28 @@ def close_contract_action(request_id):
     actor_name = data.get('actor_name')
     actor_role = data.get('actor_role') or step['role']
     comment = data.get('comment')
+    attachments = data.get('attachment_urls') or []
+    if isinstance(attachments, str):
+        try:
+            parsed = json.loads(attachments)
+            if isinstance(parsed, list):
+                attachments = parsed
+        except Exception:
+            attachments = [a.strip() for a in attachments.split(',') if a.strip()]
+    attachments_json = json.dumps(attachments) if attachments else None
 
     if DB_TYPE.lower() == 'mysql':
         cur = conn.cursor()
         cur.execute('''
-            INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (request_id, current_step_key, step['label'], actor_role, result, comment, actor_email, actor_id, actor_name, acted_at))
+            INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at, attachments)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (request_id, current_step_key, step['label'], actor_role, result, comment, actor_email, actor_id, actor_name, acted_at, attachments_json))
     else:
         cur = conn.cursor()
         cur.execute('''
-            INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (request_id, current_step_key, step['label'], actor_role, result, comment, actor_email, actor_id, actor_name, acted_at))
+            INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at, attachments)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (request_id, current_step_key, step['label'], actor_role, result, comment, actor_email, actor_id, actor_name, acted_at, attachments_json))
 
     new_status = 'under_review'
     new_step_key = current_step_key

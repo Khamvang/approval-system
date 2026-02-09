@@ -159,8 +159,11 @@ class _CloseContractApprovalPageState extends State<CloseContractApprovalPage> {
         // update existing request (resubmit)
         int? reqId;
         final id = _currentRequest!['id'];
-        if (id is int) reqId = id;
-        else if (id is String) reqId = int.tryParse(id);
+        if (id is int) {
+          reqId = id;
+        } else if (id is String) {
+          reqId = int.tryParse(id);
+        }
         if (reqId == null) throw Exception('Invalid request id for update');
         final item = await CloseContractApi.updateRequest(reqId, payload: payload, attachment: _attachment);
         setState(() => _currentRequest = item);

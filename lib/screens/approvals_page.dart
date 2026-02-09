@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -306,7 +307,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     }
 
     // sort cases by last update datetime (prefer updated_at, then created_at, then time)
-    DateTime _parseCaseTime(Map<String, dynamic> c) {
+    DateTime parseCaseTime(Map<String, dynamic> c) {
       final src = c['last_submit_at'] ?? c['updated_at'] ?? c['created_at'] ?? c['time'];
       if (src == null) return DateTime.fromMillisecondsSinceEpoch(0);
       try {
@@ -316,7 +317,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
         return DateTime.fromMillisecondsSinceEpoch(0);
       }
     }
-    cases.sort((a, b) => _parseCaseTime(b).compareTo(_parseCaseTime(a)));
+    cases.sort((a, b) => parseCaseTime(b).compareTo(parseCaseTime(a)));
 
     return LayoutBuilder(builder: (context, constraints) {
       final total = constraints.maxWidth;
@@ -669,46 +670,44 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                                 ),
                               ),
 
-                            // Attachments (from DB: attachment_url)
-                            // Attachments (flexible extraction from multiple DB fields)
-                            if ((_selectedCase!['remark'] ?? '').toString().isNotEmpty)
-                              Builder(builder: (ctx) {
-                                final urls = _extractAttachmentUrls(_selectedCase!);
-                                if (urls.isEmpty) return const SizedBox.shrink();
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                  children: [
-                                    const SelectableText('Attachment', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    const SizedBox(height: 6),
-                                    for (final u in urls)
-                                      Padding(
-                                        padding: const EdgeInsets.only(bottom: 6.0),
-                                        child: Row(children: [
-                                          Expanded(child: SelectableText(_attachmentLabel(u), maxLines: 2, style: const TextStyle(color: Colors.blue))),
-                                          const SizedBox(width: 8),
-                                          IconButton(
-                                            tooltip: 'Open',
-                                            onPressed: () async {
-                                              await _showAttachmentPreview(u);
-                                            },
-                                            icon: const Icon(Icons.open_in_new, size: 18),
-                                          ),
-                                          IconButton(
-                                            tooltip: 'Copy URL',
-                                            onPressed: () async {
-                                              final full = _normalizeAttachmentUrl(u);
-                                              await Clipboard.setData(ClipboardData(text: full));
-                                              if (!mounted) return;
-                                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Attachment URL copied')));
-                                            },
-                                            icon: const Icon(Icons.copy, size: 18),
-                                          ),
-                                        ]),
-                                      ),
-                                    const SizedBox(height: 12),
-                                  ],
-                                );
-                              }),
+                            // Attachments (from DB: attachment_url) — show even if remark is empty
+                            Builder(builder: (ctx) {
+                              final urls = _extractAttachmentUrls(_selectedCase!);
+                              if (urls.isEmpty) return const SizedBox.shrink();
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const SelectableText('Attachment', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 6),
+                                  for (final u in urls)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 6.0),
+                                      child: Row(children: [
+                                        Expanded(child: SelectableText(_attachmentLabel(u), maxLines: 2, style: const TextStyle(color: Colors.blue))),
+                                        const SizedBox(width: 8),
+                                        IconButton(
+                                          tooltip: 'Open',
+                                          onPressed: () async {
+                                            await _showAttachmentPreview(u);
+                                          },
+                                          icon: const Icon(Icons.open_in_new, size: 18),
+                                        ),
+                                        IconButton(
+                                          tooltip: 'Copy URL',
+                                          onPressed: () async {
+                                            final full = _normalizeAttachmentUrl(u);
+                                            await Clipboard.setData(ClipboardData(text: full));
+                                            if (!mounted) return;
+                                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Attachment URL copied')));
+                                          },
+                                          icon: const Icon(Icons.copy, size: 18),
+                                        ),
+                                      ]),
+                                    ),
+                                  const SizedBox(height: 12),
+                                ],
+                              );
+                            }),
                           ],
                         ),
                       ),
@@ -749,7 +748,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                                     title: Text(c is Map ? (c['user_name'] ?? c['user_email'] ?? '').toString() : ''),
                                     subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(c is Map ? (c['text'] ?? c['comment'] ?? c.toString()).toString() : c.toString())]),
                                     trailing: Builder(builder: (ctx) {
-                                      final created = c is Map ? (c['created_at'] ?? c['at'] ?? null) : null;
+                                      final created = c is Map ? (c['created_at'] ?? c['at']) : null;
                                       final abs = _formatDateTime(created);
                                       final rel = _relativeTime(created);
                                       return Column(
@@ -1106,9 +1105,9 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     final intPart = parts[0];
     final intFormatted = intPart.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',');
     if (parts.length > 1) {
-      return (negative ? '-' : '') + '$intFormatted.${parts[1]}';
+      return '${negative ? '-' : ''}$intFormatted.${parts[1]}';
     }
-    return (negative ? '-' : '') + intFormatted;
+    return '${negative ? '-' : ''}$intFormatted';
   }
 
   // Normalize attachment URL to an absolute URL using the same host logic as the API.
@@ -1121,7 +1120,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
         ? 'http://localhost:5000'
         : (defaultTargetPlatform == TargetPlatform.android ? 'http://10.0.2.2:5000' : 'http://localhost:5000');
     if (s.startsWith('/')) return '$host$s';
-    return '$host/${s}';
+    return '$host/$s';
   }
 
   // removed legacy fallbacks for paid_term_total/paid_term_display — use DB fields only
@@ -1267,6 +1266,53 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
                         const SizedBox(height: 8),
                         Text(comment, style: const TextStyle(), maxLines: 3, overflow: TextOverflow.ellipsis),
                       ],
+                      // attachments for this action (if any)
+                      Builder(builder: (ctx) {
+                        final actionAttachments = _extractAttachmentUrls(a);
+                        if (actionAttachments.isEmpty) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const SizedBox(height: 6),
+                            Wrap(spacing: 8, runSpacing: 6, children: [
+                              for (final u in actionAttachments)
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(minWidth: 140, maxWidth: 320),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                    decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey.shade300)),
+                                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                      Expanded(
+                                        child: TextButton(
+                                          style: TextButton.styleFrom(padding: EdgeInsets.zero, alignment: Alignment.centerLeft, minimumSize: const Size(0, 0)),
+                                          onPressed: () async {
+                                            await _showAttachmentPreview(u);
+                                          },
+                                          child: Text(
+                                            _attachmentLabel(u),
+                                            style: const TextStyle(color: Colors.blue),
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        tooltip: 'Copy URL',
+                                        onPressed: () async {
+                                          final full = _normalizeAttachmentUrl(u);
+                                          await Clipboard.setData(ClipboardData(text: full));
+                                          if (!mounted) return;
+                                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Attachment URL copied')));
+                                        },
+                                        icon: const Icon(Icons.copy, size: 18),
+                                      ),
+                                    ]),
+                                  ),
+                                ),
+                            ])
+                          ]),
+                        );
+                      }),
                     ]),
                   ),
                   Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -1290,7 +1336,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   }
 
   Widget _approverAvatar(String nameOrEmail) {
-    final s = (nameOrEmail ?? '').toString();
+    final s = nameOrEmail.toString();
     String initials = '';
     if (s.isNotEmpty) {
       final parts = s.split(RegExp(r'[\s@._-]+')).where((p) => p.isNotEmpty).toList();
@@ -1304,7 +1350,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   }
 
   Widget _resultBadge(String result) {
-    final r = (result ?? '').toString().toLowerCase();
+    final r = result.toLowerCase();
     Color bg = Colors.grey.shade200;
     Color fg = Colors.black87;
     if (r.contains('approve') || r == 'approved') {
@@ -1410,31 +1456,113 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     if (_selectedCase == null) {
       return;
     }
-    final commentController = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(result == 'approve' ? 'Approve' : (result == 'reject' ? 'Reject' : 'Send Back')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Optional comment:'),
-            TextField(controller: commentController, maxLines: 3),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirm')),
-        ],
-      ),
-    );
-    if (ok != true) {
+    // determine request id early so we can upload attachment before action
+    int? reqId;
+    final id = _selectedCase!['id'];
+    if (id is int) {
+      reqId = id;
+    } else if (id is String) {
+      reqId = int.tryParse(id);
+    }
+    if (reqId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot perform action: invalid request id')));
       return;
     }
-    await _performAction(result, comment: commentController.text.trim());
+
+    final commentController = TextEditingController();
+    List<PlatformFile> pickedFiles = [];
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx2, setStateDialog) {
+        return AlertDialog(
+          title: Text(result == 'approve' ? 'Approve' : (result == 'reject' ? 'Reject' : 'Send Back')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Optional comment:'),
+              TextField(controller: commentController, maxLines: 3),
+              const SizedBox(height: 12),
+              Row(children: [
+                const Text('Attachments:'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: pickedFiles.isEmpty
+                        ? [const Text('No files selected')]
+                        : [
+                            for (int i = 0; i < pickedFiles.length; i++)
+                              Chip(
+                                label: Text(pickedFiles[i].name, overflow: TextOverflow.ellipsis),
+                                onDeleted: () {
+                                  setStateDialog(() {
+                                    pickedFiles.removeAt(i);
+                                  });
+                                },
+                              ),
+                          ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () async {
+                    try {
+                      final res = await FilePicker.platform.pickFiles(
+                        allowMultiple: true,
+                        type: FileType.custom,
+                        allowedExtensions: [
+                          'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'heic', 'heif',
+                          'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'zip'
+                        ],
+                      );
+                      if (res != null && res.files.isNotEmpty) {
+                        setStateDialog(() { pickedFiles = res.files; });
+                      }
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('File pick failed: $e')));
+                    }
+                  },
+                  child: const Text('Choose'),
+                ),
+                if (pickedFiles.isNotEmpty)
+                  TextButton(onPressed: () { setStateDialog(() { pickedFiles = []; }); }, child: const Text('Clear')),
+              ]),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx2, false), child: const Text('Cancel')),
+            ElevatedButton(onPressed: () => Navigator.pop(ctx2, true), child: const Text('Confirm')),
+          ],
+        );
+      }),
+    );
+
+    if (ok != true) return;
+
+    // if attachments were chosen, upload them first via updateRequest (PATCH) before performing the action
+    List<String> uploadedUrls = [];
+    if (pickedFiles.isNotEmpty) {
+      for (final file in pickedFiles) {
+        try {
+          final updatedItem = await CloseContractApi.updateRequest(reqId, payload: {'skip_reset': '1'}, attachment: file);
+          uploadedUrls.addAll(_extractAttachmentUrls(updatedItem));
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Attachment upload failed: $e')));
+          return;
+        }
+      }
+      // dedupe
+      uploadedUrls = uploadedUrls.toSet().toList();
+    }
+
+    await _performAction(result, comment: commentController.text.trim(), attachmentUrls: uploadedUrls.isEmpty ? null : uploadedUrls);
   }
 
-  Future<void> _performAction(String result, {String? comment}) async {
+  Future<void> _performAction(String result, {String? comment, List<String>? attachmentUrls}) async {
     if (_selectedCase == null) {
       return;
     }
@@ -1458,7 +1586,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       int? actorId;
       try { actorId = int.tryParse((user['id'] ?? user['actor_id'] ?? '').toString()); } catch (_) {}
 
-      final updated = await CloseContractApi.actOnRequest(reqId, result: result, comment: comment?.isEmpty ?? true ? null : comment, actorEmail: actorEmail.isEmpty ? null : actorEmail, actorId: actorId, actorName: actorName.isEmpty ? null : actorName);
+      final updated = await CloseContractApi.actOnRequest(reqId, result: result, comment: comment?.isEmpty ?? true ? null : comment, actorEmail: actorEmail.isEmpty ? null : actorEmail, actorId: actorId, actorName: actorName.isEmpty ? null : actorName, attachmentUrls: attachmentUrls);
                         if (!mounted) {
                           return;
                         }
@@ -1483,7 +1611,11 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     if (_selectedCase == null) return;
     int? reqId;
     final id = _selectedCase!['id'];
-    if (id is int) reqId = id; else if (id is String) reqId = int.tryParse(id);
+    if (id is int) {
+      reqId = id;
+    } else if (id is String) {
+      reqId = int.tryParse(id);
+    }
     if (reqId == null) return;
     await Navigator.of(context).push(MaterialPageRoute(builder: (ctx) => CloseContractApprovalPage(initialData: _selectedCase)));
     // after return, refresh the detailed case from backend to get updated actions
@@ -1493,7 +1625,11 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
       final map = Map<String, dynamic>.from(detailed);
       // fetch comments too
       List<Map<String, dynamic>> comments = [];
-      try { comments = await CloseContractApi.listComments(reqId); } catch (_) { comments = []; }
+      try {
+        comments = await CloseContractApi.listComments(reqId);
+      } catch (_) {
+        comments = [];
+      }
       map['comments'] = comments;
       setState(() { _selectedCase = map; });
       // refresh center list
@@ -1507,14 +1643,19 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     if (_selectedCase == null) return;
     final id = _selectedCase!['id'];
     int? reqId;
-    if (id is int) reqId = id;
-    else if (id is String) reqId = int.tryParse(id);
+    if (id is int) {
+      reqId = id;
+    } else if (id is String) {
+      reqId = int.tryParse(id);
+    }
     if (reqId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid request id')));
       return;
     }
     final text = _commentController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty) {
+      return;
+    }
     setState(() { _postingComment = true; });
     try {
       final user = await Session.loadUser();
