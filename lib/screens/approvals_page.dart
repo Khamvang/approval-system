@@ -14,9 +14,19 @@ import 'close_contract_approval_page.dart';
 import '../services/close_contract_api.dart';
 
 class ApprovalsPage extends StatefulWidget {
-  const ApprovalsPage({super.key});
+  const ApprovalsPage({super.key, this.initialTabIndex, this.initialCenterSection, this.initialCenterApp});
 
-  static Route<void> route() => MaterialPageRoute<void>(builder: (context) => const ApprovalsPage());
+  final int? initialTabIndex;
+  final String? initialCenterSection;
+  final String? initialCenterApp;
+
+  static Route<void> route({int? initialTabIndex, String? initialCenterSection, String? initialCenterApp}) => MaterialPageRoute<void>(
+        builder: (context) => ApprovalsPage(
+          initialTabIndex: initialTabIndex,
+          initialCenterSection: initialCenterSection,
+          initialCenterApp: initialCenterApp,
+        ),
+      );
 
   @override
   State<ApprovalsPage> createState() => _ApprovalsPageState();
@@ -45,10 +55,10 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   int _timeoutMinutes = 30;
   // Approval Center state and sample data
   final Map<String, List<String>> _centerSections = {
-    'To-do': ['System Modification Ringi', 'Expense Approval Ringi', 'Close Contract Approval Ringi'],
-    'Done': ['Open Contract Approval Ringi'],
-    'CC': ['Clock-in/out Correction'],
-    'Submitted': ['System Modification Ringi'],
+    'To-do': ['Close Contract Approval Ringi', 'System Modification Ringi', 'Expense Approval Ringi'],
+    'Done': ['Close Contract Approval Ringi', 'System Modification Ringi', 'Expense Approval Ringi'],
+    'CC': ['Close Contract Approval Ringi', 'System Modification Ringi', 'Expense Approval Ringi'],
+    'Submitted': ['Close Contract Approval Ringi', 'System Modification Ringi', 'Expense Approval Ringi'],
   };
 
   final Map<String, List<Map<String, String>>> _sampleCases = {
@@ -107,6 +117,22 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   void initState() {
     super.initState();
     _loadPrefs();
+    _applyInitialCenterSelection();
+  }
+
+  void _applyInitialCenterSelection() {
+    final section = widget.initialCenterSection;
+    if (section != null && _centerSections.containsKey(section)) {
+      _selectedCenterSection = section;
+      final apps = _centerSections[section] ?? [];
+      if (apps.isNotEmpty) {
+        if (widget.initialCenterApp != null && apps.contains(widget.initialCenterApp)) {
+          _selectedCenterApp = widget.initialCenterApp!;
+        } else {
+          _selectedCenterApp = apps.first;
+        }
+      }
+    }
   }
 
   Future<void> _loadCloseContractCases() async {
@@ -178,6 +204,9 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     final isWide = MediaQuery.of(context).size.width >= 900;
     return DefaultTabController(
       length: 3,
+      initialIndex: widget.initialTabIndex != null && widget.initialTabIndex! >= 0 && widget.initialTabIndex! < 3
+          ? widget.initialTabIndex!
+          : 0,
       child: Scaffold(
         body: Row(
           children: [

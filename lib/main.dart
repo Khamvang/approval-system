@@ -72,7 +72,16 @@ class _MainAppState extends State<MainApp> {
               case '/users':
                 return MaterialPageRoute(builder: (_) => HomePage(user: usr, initialIndex: 3));
               case '/approvals':
-                return ApprovalsPage.route();
+                final args = settings.arguments;
+                int? tab;
+                String? centerSection;
+                String? centerApp;
+                if (args is Map) {
+                  tab = (args['tab'] ?? args['initialTabIndex']) as int?;
+                  centerSection = (args['centerSection'] ?? args['initialCenterSection']) as String?;
+                  centerApp = (args['centerApp'] ?? args['initialCenterApp']) as String?;
+                }
+                return ApprovalsPage.route(initialTabIndex: tab, initialCenterSection: centerSection, initialCenterApp: centerApp);
               default:
                 return null;
             }

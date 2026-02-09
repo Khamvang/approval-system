@@ -176,11 +176,29 @@ class _CloseContractApprovalPageState extends State<CloseContractApprovalPage> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Submitted for Credit Approval')));
       }
       await _refreshTodo();
+      await _goToSubmittedView();
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) {
+        setState(() => _error = e.toString());
+      }
     } finally {
-      setState(() => _submitting = false);
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
     }
+  }
+
+  Future<void> _goToSubmittedView() async {
+    if (!mounted) return;
+    await Navigator.of(context).pushNamedAndRemoveUntil(
+      '/approvals',
+      (route) => false,
+      arguments: {
+        'tab': 1, // Approval Center tab
+        'centerSection': 'Submitted',
+        'centerApp': 'Close Contract Approval Ringi',
+      },
+    );
   }
 
   bool _canActOnCurrent() {
