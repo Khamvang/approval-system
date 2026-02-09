@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:pdf/pdf.dart';
+import 'package:pdf/pdf.dart' as pdf;
 import '../services/close_contract_api.dart';
 import '../services/session.dart';
 
@@ -14,6 +14,16 @@ const _steps = [
   {'key': 'system', 'label': 'System Approval', 'role': 'System Approval'},
   {'key': 'coo', 'label': 'COO & Admin Approval', 'role': 'COO & Admin Approval'},
   {'key': 'lms', 'label': 'LMS Void Approval', 'role': 'LMS Void Approval'},
+];
+
+const List<String> _collectionTypes = [
+  'This month',
+  'Last month',
+  '2 month delay',
+  'SOA',
+  'Real estate',
+  'No1 auto',
+  '4 Products',
 ];
 
 class CloseContractApprovalPage extends StatefulWidget {
@@ -34,6 +44,7 @@ class _CloseContractApprovalPageState extends State<CloseContractApprovalPage> {
   Map<String, dynamic>? _user;
   List<Map<String, dynamic>> _todo = [];
   String? _error;
+  String? _selectedCollectionType;
 
   @override
   void initState() {
@@ -66,6 +77,7 @@ class _CloseContractApprovalPageState extends State<CloseContractApprovalPage> {
       _ctrl[key] = TextEditingController();
     }
     _ctrl['collection_type']!.text = 'This month';
+    _selectedCollectionType = _ctrl['collection_type']!.text;
     _loadUserAndData();
     // if initial data provided (resubmit), populate form
     if (widget.initialData != null) {
@@ -115,6 +127,9 @@ class _CloseContractApprovalPageState extends State<CloseContractApprovalPage> {
           _ctrl[key]!.text = data[key].toString();
         }
       } catch (_) {}
+    }
+    if (data.containsKey('collection_type') && data['collection_type'] != null) {
+      _selectedCollectionType = data['collection_type'].toString();
     }
   }
 
@@ -289,7 +304,7 @@ class _CloseContractApprovalPageState extends State<CloseContractApprovalPage> {
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text('${s['label']}: $result ($time)'),
-                    if (comment.isNotEmpty) pw.Text('Comment: $comment', style: pw.TextStyle(color: PdfColors.grey)),
+                    if (comment.isNotEmpty) pw.Text('Comment: $comment', style: pw.TextStyle(color: pdf.PdfColors.grey)),
                     pw.SizedBox(height: 4),
                   ],
                 );
@@ -344,7 +359,7 @@ class _CloseContractApprovalPageState extends State<CloseContractApprovalPage> {
                             spacing: 16,
                             runSpacing: 12,
                             children: [
-                              _field('Collection type', 'collection_type'),
+                              _collectionTypeDropdown(),
                               _field('Contract No', 'contract_no', requiredField: true),
                               _field('Person in Charge', 'person_in_charge'),
                               _field('Manager of Person in Charge', 'manager_in_charge'),
@@ -553,6 +568,24 @@ class _CloseContractApprovalPageState extends State<CloseContractApprovalPage> {
         validator: requiredField
             ? (v) => (v == null || v.trim().isEmpty) ? 'Required' : null
             : null,
+      ),
+    );
+  }
+
+  Widget _collectionTypeDropdown() {
+    return SizedBox(
+      width: 320,
+      child: DropdownButtonFormField<String>(
+        initialValue: _collectionTypes.contains(_selectedCollectionType) ? _selectedCollectionType : _collectionTypes.first,
+        items: _collectionTypes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+        decoration: const InputDecoration(labelText: 'Collection type', border: OutlineInputBorder()),
+        onChanged: (v) {
+          setState(() {
+            _selectedCollectionType = v;
+            _ctrl['collection_type']!.text = v ?? '';
+          });
+        },
+        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
       ),
     );
   }

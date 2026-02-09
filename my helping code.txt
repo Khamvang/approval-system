@@ -36,7 +36,7 @@ python init_db.py
 #stage, commit, and push the current branch to origin on GitHub.
 
     git add -A
-    git commit -m "Upload approval evidents"
+    git commit -m "Updated return the page after submit"
     git push origin main
 
 

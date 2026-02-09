@@ -4,6 +4,7 @@ from flask_cors import CORS
 import os
 import sqlite3
 import json
+from typing import Any, Dict, List, Optional, Tuple, cast
 from werkzeug.security import check_password_hash
 from werkzeug.security import generate_password_hash
 from dotenv import load_dotenv
@@ -213,14 +214,14 @@ def ensure_close_contract_tables():
         conn.close()
 
 
-def _step_by_key(key: str):
+def _step_by_key(key: Optional[str]) -> Optional[Dict[str, Any]]:
     for s in CLOSE_STEPS:
         if s['key'] == key:
             return s
     return None
 
 
-def _next_step_key(current: str | None):
+def _next_step_key(current: Optional[str]) -> Optional[str]:
     keys = [s['key'] for s in CLOSE_STEPS]
     if current is None:
         return 'submit'
@@ -261,15 +262,15 @@ def close_contract_row_to_dict(row):
                 pass
     return d
 
-def query_user(email):
+def query_user(email: str) -> Optional[Dict[str, Any]]:
     if DB_TYPE.lower() == 'mysql':
         conn = get_mysql_conn()
-        cur = conn.cursor(dictionary=True)
+        cur = conn.cursor(dictionary=True)  # type: ignore[arg-type]
         cur.execute('SELECT * FROM users WHERE email = %s', (email,))
         row = cur.fetchone()
         cur.close()
         conn.close()
-        return row
+        return cast(Optional[Dict[str, Any]], row)
     else:
         conn = get_sqlite_conn()
         cur = conn.cursor()
@@ -280,16 +281,16 @@ def query_user(email):
         return dict(row) if row is not None else None
 
 
-def query_all_users():
+def query_all_users() -> List[Dict[str, Any]]:
     select_cols = 'id, email, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status'
     if DB_TYPE.lower() == 'mysql':
         conn = get_mysql_conn()
-        cur = conn.cursor(dictionary=True)
+        cur = conn.cursor(dictionary=True)  # type: ignore[arg-type]
         cur.execute(f'SELECT {select_cols} FROM users')
         rows = cur.fetchall()
         cur.close()
         conn.close()
-        return rows
+        return cast(List[Dict[str, Any]], rows)
     else:
         conn = get_sqlite_conn()
         cur = conn.cursor()
@@ -299,15 +300,15 @@ def query_all_users():
         return [dict(r) for r in rows]
 
 
-def get_user_by_id(user_id):
+def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
     if DB_TYPE.lower() == 'mysql':
         conn = get_mysql_conn()
-        cur = conn.cursor(dictionary=True)
+        cur = conn.cursor(dictionary=True)  # type: ignore[arg-type]
         cur.execute('SELECT id, email, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status FROM users WHERE id = %s', (user_id,))
         row = cur.fetchone()
         cur.close()
         conn.close()
-        return row
+        return cast(Optional[Dict[str, Any]], row)
     else:
         conn = get_sqlite_conn()
         cur = conn.cursor()
@@ -341,7 +342,7 @@ def login():
         return jsonify({'error': 'Invalid credentials'}), 401
 
     # row is a dict (converted for sqlite) when present
-    password_hash = row.get('password_hash')
+    password_hash = str(row.get('password_hash', ''))
 
     if not check_password_hash(password_hash, password):
         logging.warning('Failed password for email: %s', email)
@@ -366,7 +367,7 @@ def debug_users():
     select_cols = 'id, email, role, department, staff_no, first_name, last_name, nickname, under_manager, last_login, status'
     if DB_TYPE.lower() == 'mysql':
         conn = get_mysql_conn()
-        cur = conn.cursor(dictionary=True)
+        cur = conn.cursor(dictionary=True)  # type: ignore[arg-type]
         cur.execute(f'SELECT {select_cols} FROM users')
         rows = cur.fetchall()
         cur.close()
@@ -609,13 +610,13 @@ def _save_attachment_if_any(file_storage):
         return None
 
 
-def _fetch_actions_for_request(conn, request_id):
+def _fetch_actions_for_request(conn, request_id: int) -> List[Dict[str, Any]]:
     if DB_TYPE.lower() == 'mysql':
-        cur = conn.cursor(dictionary=True)
+        cur = conn.cursor(dictionary=True)  # type: ignore[arg-type]
         cur.execute('SELECT * FROM close_contract_actions WHERE request_id = %s ORDER BY acted_at ASC, id ASC', (request_id,))
         rows = cur.fetchall()
         cur.close()
-        return rows
+        return cast(List[Dict[str, Any]], rows)
     cur = conn.cursor()
     cur.execute('SELECT * FROM close_contract_actions WHERE request_id = ? ORDER BY acted_at ASC, id ASC', (request_id,))
     rows = cur.fetchall()
@@ -623,13 +624,13 @@ def _fetch_actions_for_request(conn, request_id):
     return [dict(r) for r in rows]
 
 
-def _fetch_comments_for_request(conn, request_id):
+def _fetch_comments_for_request(conn, request_id: int) -> List[Dict[str, Any]]:
     if DB_TYPE.lower() == 'mysql':
-        cur = conn.cursor(dictionary=True)
+        cur = conn.cursor(dictionary=True)  # type: ignore[arg-type]
         cur.execute('SELECT id, request_id, user_id, user_email, user_name, text, created_at FROM close_contract_comments WHERE request_id = %s ORDER BY created_at ASC, id ASC', (request_id,))
         rows = cur.fetchall()
         cur.close()
-        return rows
+        return cast(List[Dict[str, Any]], rows)
     cur = conn.cursor()
     cur.execute('SELECT id, request_id, user_id, user_email, user_name, text, created_at FROM close_contract_comments WHERE request_id = ? ORDER BY created_at ASC, id ASC', (request_id,))
     rows = cur.fetchall()
@@ -637,13 +638,13 @@ def _fetch_comments_for_request(conn, request_id):
     return [dict(r) for r in rows]
 
 
-def _load_request(conn, request_id):
+def _load_request(conn, request_id: int) -> Optional[Dict[str, Any]]:
     if DB_TYPE.lower() == 'mysql':
-        cur = conn.cursor(dictionary=True)
+        cur = conn.cursor(dictionary=True)  # type: ignore[arg-type]
         cur.execute('SELECT * FROM close_contract_forms WHERE id = %s', (request_id,))
         row = cur.fetchone()
         cur.close()
-        return row
+        return cast(Optional[Dict[str, Any]], row)
     cur = conn.cursor()
     cur.execute('SELECT * FROM close_contract_forms WHERE id = ?', (request_id,))
     row = cur.fetchone()
@@ -793,18 +794,21 @@ def close_contracts():
             )
             placeholders = ', '.join(['%s'] * len(base_fields))
             cur.execute(f'INSERT INTO close_contract_forms ({cols}) VALUES ({placeholders})', base_fields)
-            request_id = cur.lastrowid
+            raw_request_id = cur.lastrowid
+            if raw_request_id is None:
+                raise ValueError('Failed to obtain request id after insert')
+            request_id_int = int(raw_request_id)
             conn.commit()
             # add submit action
             act_placeholders = ', '.join(['%s'] * 10)
-            cur.execute(f'INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at) VALUES ({act_placeholders})', (request_id, 'submit', 'Submit', 'Submitter', 'submitted', payload.get('remark') or '', payload.get('created_by_email'), _to_int(payload.get('created_by_id')), payload.get('created_by_name'), now))
+            cur.execute(f'INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at) VALUES ({act_placeholders})', (request_id_int, 'submit', 'Submit', 'Submitter', 'submitted', payload.get('remark') or '', payload.get('created_by_email'), _to_int(payload.get('created_by_id')), payload.get('created_by_name'), now))
             conn.commit()
-            row = _load_request(conn, request_id)
+            row = _load_request(conn, request_id_int)
             row = close_contract_row_to_dict(row)
-            row['actions'] = _fetch_actions_for_request(conn, request_id)
+            row['actions'] = _fetch_actions_for_request(conn, request_id_int)
             cur.close()
             conn.close()
-            logging.info('Created close_contract id=%s by %s', request_id, payload.get('created_by_email'))
+            logging.info('Created close_contract id=%s by %s', request_id_int, payload.get('created_by_email'))
             return jsonify({'ok': True, 'item': row}), 201
         except Exception as e:
             conn.rollback()
@@ -825,17 +829,20 @@ def close_contracts():
             )
             placeholders = ', '.join(['?'] * len(base_fields))
             cur.execute(f'INSERT INTO close_contract_forms ({cols}) VALUES ({placeholders})', base_fields)
-            request_id = cur.lastrowid
+            raw_request_id = cur.lastrowid
+            if raw_request_id is None:
+                raise ValueError('Failed to obtain request id after insert')
+            request_id_int = int(raw_request_id)
             conn.commit()
             act_placeholders = ', '.join(['?'] * 10)
-            cur.execute(f'INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at) VALUES ({act_placeholders})', (request_id, 'submit', 'Submit', 'Submitter', 'submitted', payload.get('remark') or '', payload.get('created_by_email'), _to_int(payload.get('created_by_id')), payload.get('created_by_name'), now))
+            cur.execute(f'INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at) VALUES ({act_placeholders})', (request_id_int, 'submit', 'Submit', 'Submitter', 'submitted', payload.get('remark') or '', payload.get('created_by_email'), _to_int(payload.get('created_by_id')), payload.get('created_by_name'), now))
             conn.commit()
-            row = _load_request(conn, request_id)
+            row = _load_request(conn, request_id_int)
             row = close_contract_row_to_dict(row)
-            row['actions'] = _fetch_actions_for_request(conn, request_id)
+            row['actions'] = _fetch_actions_for_request(conn, request_id_int)
             cur.close()
             conn.close()
-            logging.info('Created close_contract id=%s by %s', request_id, payload.get('created_by_email'))
+            logging.info('Created close_contract id=%s by %s', request_id_int, payload.get('created_by_email'))
             return jsonify({'ok': True, 'item': row}), 201
         except Exception as e:
             conn.rollback()
@@ -942,6 +949,7 @@ def close_contract_update(request_id):
         conn.close()
         return jsonify({'error': 'Nothing to update'}), 400
 
+    cur = None
     try:
         if DB_TYPE.lower() == 'mysql':
             q = ', '.join([u.replace(' = %s', ' = %s') for u in updates])
@@ -976,7 +984,8 @@ def close_contract_update(request_id):
             return jsonify({'ok': True, 'item': updated})
     except Exception as e:
         conn.rollback()
-        cur.close()
+        if cur:
+            cur.close()
         conn.close()
         logging.exception('Failed to update close_contract: %s', e)
         return jsonify({'error': 'Update failed', 'detail': str(e)}), 500
@@ -1014,7 +1023,7 @@ def close_contract_comments(request_id):
         comment_id = cur.lastrowid
         cur.close()
         # fetch inserted
-        cur = conn.cursor(dictionary=True)
+        cur = conn.cursor(dictionary=True)  # type: ignore[arg-type]
         cur.execute('SELECT id, request_id, user_id, user_email, user_name, text, created_at FROM close_contract_comments WHERE id = %s', (comment_id,))
         row = cur.fetchone()
         cur.close()
@@ -1030,7 +1039,8 @@ def close_contract_comments(request_id):
         cur.execute('SELECT id, request_id, user_id, user_email, user_name, text, created_at FROM close_contract_comments WHERE id = ?', (comment_id,))
         r = cur.fetchone()
         conn.close()
-        return jsonify({'ok': True, 'comment': dict(r) if r else None}), 201
+        comment_row = dict(r) if r else None  # type: ignore[arg-type]
+        return jsonify({'ok': True, 'comment': comment_row}), 201
 
 
 @app.route('/api/close-contracts/<int:request_id>/action', methods=['POST'])
@@ -1052,7 +1062,8 @@ def close_contract_action(request_id):
         conn.close()
         return jsonify({'error': 'Request already finalized'}), 400
 
-    step = _step_by_key(current_step_key)
+    step_key_str = current_step_key if isinstance(current_step_key, str) else (str(current_step_key) if current_step_key is not None else None)
+    step = _step_by_key(step_key_str)
     if not step:
         conn.close()
         return jsonify({'error': 'Invalid current step'}), 400
@@ -1078,7 +1089,7 @@ def close_contract_action(request_id):
         cur.execute('''
             INSERT INTO close_contract_actions (request_id, step_key, step_label, role, result, comment, actor_email, actor_id, actor_name, acted_at, attachments)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (request_id, current_step_key, step['label'], actor_role, result, comment, actor_email, actor_id, actor_name, acted_at, attachments_json))
+        ''', (request_id, current_step_key, step['label'], actor_role, result, comment, actor_email, actor_id, actor_name, acted_at, attachments_json))  # type: ignore[arg-type]
     else:
         cur = conn.cursor()
         cur.execute('''
@@ -1087,9 +1098,9 @@ def close_contract_action(request_id):
         ''', (request_id, current_step_key, step['label'], actor_role, result, comment, actor_email, actor_id, actor_name, acted_at, attachments_json))
 
     new_status = 'under_review'
-    new_step_key = current_step_key
+    new_step_key = step_key_str
     if result == 'approve':
-        nxt = _next_step_key(current_step_key)
+        nxt = _next_step_key(step_key_str)
         if nxt:
             new_step_key = nxt
             new_status = 'under_review'
@@ -1102,7 +1113,7 @@ def close_contract_action(request_id):
         new_step_key = 'submit'
 
     if DB_TYPE.lower() == 'mysql':
-        cur.execute('UPDATE close_contract_forms SET status = %s, current_step = %s, updated_at = %s WHERE id = %s', (new_status, new_step_key, acted_at, request_id))
+        cur.execute('UPDATE close_contract_forms SET status = %s, current_step = %s, updated_at = %s WHERE id = %s', (new_status, new_step_key, acted_at, request_id))  # type: ignore[arg-type]
         conn.commit()
         cur.close()
         updated = _load_request(conn, request_id)
